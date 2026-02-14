@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
-  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban 
+  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -22,6 +22,7 @@ interface TeamMember {
 const SettingsPage: React.FC = () => {
   // --- Estados de Configuração Geral ---
   const [settings, setSettings] = useState<any>({
+    coverImage: '', // NOVA CAPA
     heroImage: '',
     aboutImage: '',
     venueTitle: 'LATITUDE22',
@@ -32,6 +33,7 @@ const SettingsPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingAbout, setUploadingAbout] = useState(false);
 
@@ -112,7 +114,7 @@ const SettingsPage: React.FC = () => {
     return data.data.url;
   };
 
-  const handleImageUpload = async (file: File, imageType: 'hero' | 'about') => {
+  const handleImageUpload = async (file: File, imageType: 'cover' | 'hero' | 'about') => {
     if (!file) return;
 
     // Validar tipo de arquivo
@@ -129,7 +131,7 @@ const SettingsPage: React.FC = () => {
       return;
     }
 
-    const setUploading = imageType === 'hero' ? setUploadingHero : setUploadingAbout;
+    const setUploading = imageType === 'cover' ? setUploadingCover : imageType === 'hero' ? setUploadingHero : setUploadingAbout;
     setUploading(true);
 
     try {
@@ -138,7 +140,9 @@ const SettingsPage: React.FC = () => {
 
       // Atualizar estado local
       const newSettings = { ...settings };
-      if (imageType === 'hero') {
+      if (imageType === 'cover') {
+        newSettings.coverImage = imageUrl;
+      } else if (imageType === 'hero') {
         newSettings.heroImage = imageUrl;
       } else {
         newSettings.aboutImage = imageUrl;
@@ -278,24 +282,81 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {message && (
+        <div className={`p-4 rounded-lg text-[10px] font-bold uppercase tracking-widest text-center animate-bounce ${message.includes('Erro') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
+          {message}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
-          {message && (
-            <div className={`p-4 rounded-lg text-[10px] font-bold uppercase tracking-widest text-center animate-bounce ${message.includes('Erro') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
-              {message}
+          {/* NOVA SEÇÃO: Capa da Página Pública */}
+          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
+            <h3 className="mb-8 font-bold text-stone-100 flex items-center">
+              <Image size={18} className="mr-2 text-amber-500" />
+              Capa da Página Pública (Banner Principal)
+            </h3>
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">
+                Imagem de Capa (Recomendado: 1920x600px)
+              </label>
+              <div className="relative group aspect-[16/5] rounded-xl overflow-hidden bg-stone-950 border border-white/5">
+                <img 
+                  src={settings.coverImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100'} 
+                  className="h-full w-full object-cover opacity-60 group-hover:opacity-80 transition-all" 
+                  alt="Cover" 
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
+                  <input
+                    type="url"
+                    value={settings.coverImage}
+                    onChange={e => setSettings({...settings, coverImage: e.target.value})}
+                    className="w-full max-w-xl rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
+                    placeholder="Coloque a URL da capa..."
+                  />
+                  <div className="flex items-center gap-2 w-full max-w-xl">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, 'cover');
+                        }}
+                        disabled={uploadingCover}
+                      />
+                      <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                        {uploadingCover ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                            <span>Enviando...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} />
+                            <span>Upload da Capa (máx 5MB)</span>
+                          </>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
 
           {/* Branding Images */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <h3 className="mb-8 font-bold text-stone-100 flex items-center">
               <Camera size={18} className="mr-2 text-amber-500" />
-              Impacto Visual (Imagens)
+              Imagens de Impacto Visual
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Hero Image */}
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Capa Principal (Hero Image)</label>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Seção Hero (Principal)</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img 
                     src={settings.heroImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3'} 
@@ -308,7 +369,7 @@ const SettingsPage: React.FC = () => {
                       value={settings.heroImage}
                       onChange={e => setSettings({...settings, heroImage: e.target.value})}
                       className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="Coloque a URL da foto..."
+                      placeholder="URL da imagem..."
                     />
                     <div className="flex items-center gap-2 w-full">
                       <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
@@ -344,7 +405,7 @@ const SettingsPage: React.FC = () => {
 
               {/* About Image */}
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Destaque Secundário (Sobre)</label>
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Seção Sobre Nós</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img 
                     src={settings.aboutImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622'} 
@@ -357,7 +418,7 @@ const SettingsPage: React.FC = () => {
                       value={settings.aboutImage}
                       onChange={e => setSettings({...settings, aboutImage: e.target.value})}
                       className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="URL da imagem secundária..."
+                      placeholder="URL da imagem..."
                     />
                     <div className="flex items-center gap-2 w-full">
                       <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
@@ -458,10 +519,10 @@ const SettingsPage: React.FC = () => {
               <button 
                 onClick={handleSaveSettings}
                 disabled={loading}
-                className="flex items-center justify-center space-x-3 rounded-lg bg-stone-800 border border-white/10 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-300 hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all disabled:opacity-50"
+                className="flex items-center justify-center space-x-3 rounded-lg bg-amber-600 px-10 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white hover:bg-amber-700 shadow-2xl shadow-amber-900/40 disabled:opacity-50 transition-all hover:-translate-y-1"
               >
                 <Save size={16} />
-                <span>{loading ? 'Salvando...' : 'Salvar Textos'}</span>
+                <span>{loading ? 'Salvando...' : 'Salvar Configurações'}</span>
               </button>
             </div>
           </div>
@@ -469,11 +530,11 @@ const SettingsPage: React.FC = () => {
 
         {/* Coluna Direita: Equipe & Acesso */}
         <div className="space-y-6">
-          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl h-full">
+          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-stone-100 flex items-center">
                 <Users size={18} className="mr-2 text-amber-500" />
-                Equipe & Acesso
+                Equipe
               </h3>
               <button 
                 onClick={() => setShowMemberModal(true)}
@@ -504,26 +565,21 @@ const SettingsPage: React.FC = () => {
                   </div>
 
                   <div className="relative">
-                    {/* Botão 3 Pontinhos */}
                     <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(activeMenuId === member.id ? null : member.id);
-                      }}
+                      onClick={() => setActiveMenuId(activeMenuId === member.id ? null : member.id)}
                       className="p-2 text-stone-500 hover:text-white transition-colors"
                     >
                       <MoreVertical size={16} />
                     </button>
 
-                    {/* Dropdown Menu */}
                     {activeMenuId === member.id && (
-                      <div ref={menuRef} className="absolute right-0 top-8 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                      <div ref={menuRef} className="absolute right-0 top-8 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
                         <div className="py-1">
                           <button 
                             onClick={() => openEditModal(member)}
                             className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
                           >
-                            <Edit2 size={12} /> Editar Dados
+                            <Edit2 size={12} /> Editar
                           </button>
                           
                           <button 
@@ -531,9 +587,9 @@ const SettingsPage: React.FC = () => {
                             className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
                           >
                             {member.hasAccess ? (
-                              <><Ban size={12} className="text-red-400" /> Revogar Acesso</>
+                              <><Ban size={12} className="text-red-400" /> Revogar</>
                             ) : (
-                              <><CheckCircle size={12} className="text-green-400" /> Liberar Acesso</>
+                              <><CheckCircle size={12} className="text-green-400" /> Liberar</>
                             )}
                           </button>
 
@@ -543,14 +599,13 @@ const SettingsPage: React.FC = () => {
                             onClick={() => handleDeleteMember(member.id)}
                             className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10"
                           >
-                            <Trash2 size={12} /> Excluir Membro
+                            <Trash2 size={12} /> Excluir
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
                   
-                  {/* Indicador de Status */}
                   <div 
                     className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-stone-900 ${member.hasAccess ? 'bg-green-500' : 'bg-stone-600'}`} 
                     title={member.hasAccess ? "Acesso Permitido" : "Sem Acesso"}
@@ -563,7 +618,7 @@ const SettingsPage: React.FC = () => {
               <div className="flex items-start gap-2">
                 <Shield size={14} className="text-amber-600 mt-1" />
                 <p className="text-[10px] text-stone-500 leading-relaxed">
-                  Membros com <span className="text-green-500 font-bold">Acesso Liberado</span> podem gerenciar a galeria e ver orçamentos.
+                  Membros com <span className="text-green-500 font-bold">Acesso Liberado</span> podem gerenciar conteúdo.
                 </p>
               </div>
             </div>
@@ -595,7 +650,7 @@ const SettingsPage: React.FC = () => {
                   value={newMember.name}
                   onChange={e => setNewMember({...newMember, name: e.target.value})}
                   className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
-                  placeholder="Ex: Ana Silva"
+                  placeholder="Ana Silva"
                 />
               </div>
               
@@ -608,7 +663,7 @@ const SettingsPage: React.FC = () => {
                   value={newMember.role}
                   onChange={e => setNewMember({...newMember, role: e.target.value})}
                   className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
-                  placeholder="Ex: Cerimonialista"
+                  placeholder="Cerimonialista"
                 />
               </div>
 
@@ -644,7 +699,7 @@ const SettingsPage: React.FC = () => {
                   type="submit"
                   className="w-full rounded-lg bg-amber-600 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all"
                 >
-                  {editingMember ? 'Salvar Alterações' : 'Adicionar à Equipe'}
+                  {editingMember ? 'Salvar' : 'Adicionar'}
                 </button>
               </div>
             </form>
