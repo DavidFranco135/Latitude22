@@ -28,22 +28,43 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
   const [user, setUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
-        const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
-        if (userDoc.exists()) {
-          setUser({ uid: fbUser.uid, ...userDoc.data() } as UserProfile);
-        } else {
-          setUser({ uid: fbUser.uid, email: fbUser.email!, displayName: 'Usuário', role: UserRole.COLLABORATOR });
+        try {
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          if (userDoc.exists()) {
+            setUser({ uid: fbUser.uid, ...userDoc.data() } as UserProfile);
+          } else {
+            // Caso o usuário exista no Auth mas não no Firestore, define perfil padrão
+            setUser({ 
+              uid: fbUser.uid, 
+              email: fbUser.email!, 
+              displayName: fbUser.displayName || 'Usuário', 
+              role: UserRole.COLLABORATOR 
+            });
+          }
+        } catch (error) {
+          console.error("Erro ao buscar perfil no Firestore:", error);
+          // Em caso de erro de permissão, não trava o sistema, mas limpa o user
+          setUser(null);
         }
       } else {
         setUser(null);
       }
       setLoading(false);
     });
+
+    return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-stone-950 text-amber-500">Carregando...</div>;
+  if (loading) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-stone-950 text-amber-500">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-amber-600 border-t-transparent mb-4"></div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.3em]">Autenticando Latitude22...</p>
+      </div>
+    );
+  }
 
   if (!user) return <Navigate to="/login" />;
 
