@@ -15,20 +15,34 @@ const PublicPage: React.FC = () => {
   });
 
   useEffect(() => {
-    const unsubGallery = onSnapshot(collection(db, 'gallery'), (snapshot) => {
-      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setGalleryItems(items.length > 0 ? items : [
-        { url: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80', title: 'Salão Principal' },
-        { url: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80', title: 'Decoração de Mesa' },
-        { url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80', title: 'Iluminação Cênica' },
-      ]);
-    });
-
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), (docSnap) => {
-      if (docSnap.exists()) {
-        setSettings(prev => ({ ...prev, ...docSnap.data() }));
+    // Busca Galeria com tratamento de erro (caso o DB não exista ou falte permissão)
+    const unsubGallery = onSnapshot(collection(db, 'gallery'), 
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        if (items.length > 0) setGalleryItems(items);
+      },
+      (error) => {
+        console.warn("Firestore Gallery access error (Database not initialized or Permission Denied):", error.message);
+        // Itens de fallback caso o Firestore esteja inacessível
+        setGalleryItems([
+          { id: '1', url: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80', title: 'Salão Principal' },
+          { id: '2', url: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80', title: 'Decoração de Mesa' },
+          { id: '3', url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80', title: 'Iluminação Cênica' },
+        ]);
       }
-    });
+    );
+
+    // Busca Configurações com tratamento de erro
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'general'), 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setSettings(prev => ({ ...prev, ...docSnap.data() }));
+        }
+      },
+      (error) => {
+        console.warn("Firestore Settings access error (Database not initialized or Permission Denied):", error.message);
+      }
+    );
 
     return () => {
       unsubGallery();
@@ -64,7 +78,7 @@ const PublicPage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative flex h-screen items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <img src={settings.heroImage} className="h-full w-full object-cover opacity-60 scale-105 animate-slow-zoom" alt="Hero" />
+          <img src={settings.heroImage} className="h-full w-full object-cover opacity-60 scale-105" alt="Hero" />
           <div className="absolute inset-0 bg-gradient-to-b from-stone-950/40 via-stone-950/60 to-stone-950"></div>
         </div>
         <div className="relative z-10 text-center px-4 max-w-4xl">
