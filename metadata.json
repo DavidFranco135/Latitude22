@@ -1,7 +1,0 @@
-{
-  "name": "Latitude22 Manager",
-  "description": "Professional salon management system for Latitude22, featuring scheduling, financial control, and client management.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}
