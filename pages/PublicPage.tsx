@@ -7,6 +7,7 @@ import { db } from '../services/firebase';
 const PublicPage: React.FC = () => {
   const [galleryItems, setGalleryItems] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({
+    coverImage: '', // NOVA CAPA
     heroImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100',
     aboutImage: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80',
     venueTitle: 'LATITUDE22',
@@ -143,7 +144,7 @@ const PublicPage: React.FC = () => {
       <section className="relative flex h-screen items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src={settings.heroImage} 
+            src={settings.coverImage || settings.heroImage} 
             className="h-full w-full object-cover opacity-60 scale-105" 
             alt="Hero" 
           />
