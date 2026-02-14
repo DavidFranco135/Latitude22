@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Trash2, Edit2, X, Image as ImageIcon, MoreVertical, Plus } from 'lucide-react';
+import { Upload, Trash2, Edit2, X, Image as ImageIcon, MoreVertical, Plus, Loader2 } from 'lucide-react';
 import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
@@ -19,6 +19,7 @@ const GalleryPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<GalleryItem | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [message, setMessage] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -62,9 +63,63 @@ const GalleryPage: React.FC = () => {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const uploadToImgBB = async (file: File): Promise<string> => {
+  // Função para comprimir imagem
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Redimensionar se muito grande (máx 1920px)
+          const maxSize = 1920;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          // Converter para blob com qualidade 85%
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                resolve(blob);
+              } else {
+                reject(new Error('Erro ao comprimir imagem'));
+              }
+            },
+            'image/jpeg',
+            0.85
+          );
+        };
+        img.onerror = () => reject(new Error('Erro ao carregar imagem'));
+      };
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    });
+  };
+
+  const uploadToImgBB = async (file: File | Blob): Promise<string> => {
+    setUploadProgress('Preparando upload...');
+    
     const formData = new FormData();
     formData.append('image', file);
+
+    setUploadProgress('Enviando para servidor...');
 
     const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
       method: 'POST',
@@ -75,6 +130,7 @@ const GalleryPage: React.FC = () => {
       throw new Error('Erro ao fazer upload da imagem');
     }
 
+    setUploadProgress('Processando...');
     const data = await response.json();
     return data.data.url;
   };
@@ -87,20 +143,34 @@ const GalleryPage: React.FC = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      showMessage('Erro: Imagem muito grande. Use imagens menores que 5MB.');
+    // Aumentar limite para 10MB (antes da compressão)
+    if (file.size > 10 * 1024 * 1024) {
+      showMessage('Erro: Imagem muito grande. Use imagens menores que 10MB.');
       return;
     }
 
     setUploading(true);
+    setUploadProgress('Comprimindo imagem...');
 
     try {
-      const imageUrl = await uploadToImgBB(file);
+      // Comprimir a imagem primeiro
+      const compressedBlob = await compressImage(file);
+      
+      // Verificar tamanho após compressão
+      const compressedSizeMB = (compressedBlob.size / (1024 * 1024)).toFixed(2);
+      console.log(`Tamanho original: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
+      console.log(`Tamanho comprimido: ${compressedSizeMB}MB`);
+
+      // Upload da imagem comprimida
+      const imageUrl = await uploadToImgBB(compressedBlob);
+      
       setFormData({...formData, url: imageUrl});
-      showMessage('Imagem carregada! Adicione um título e salve.');
+      setUploadProgress('');
+      showMessage('✅ Imagem carregada! Adicione um título e salve.');
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
-      showMessage('Erro ao enviar imagem. Tente novamente.');
+      setUploadProgress('');
+      showMessage('❌ Erro ao enviar imagem. Tente novamente.');
     } finally {
       setUploading(false);
     }
@@ -110,9 +180,12 @@ const GalleryPage: React.FC = () => {
     e.preventDefault();
     
     if (!formData.title || !formData.url) {
-      showMessage('Erro: Adicione um título e uma imagem.');
+      showMessage('❌ Erro: Adicione um título e uma imagem.');
       return;
     }
+
+    setUploading(true);
+    setUploadProgress('Salvando no banco de dados...');
 
     try {
       if (editingItem) {
@@ -121,18 +194,22 @@ const GalleryPage: React.FC = () => {
           description: formData.description,
           url: formData.url
         });
-        showMessage('Foto atualizada com sucesso!');
+        showMessage('✅ Foto atualizada com sucesso!');
       } else {
         await addDoc(collection(db, 'gallery'), {
           ...formData,
           createdAt: new Date()
         });
-        showMessage('Foto adicionada à galeria!');
+        showMessage('✅ Foto adicionada à galeria!');
       }
+      setUploadProgress('');
       closeModal();
     } catch (error) {
       console.error('Erro ao salvar:', error);
-      showMessage('Erro ao salvar foto. Verifique suas permissões.');
+      setUploadProgress('');
+      showMessage('❌ Erro ao salvar foto. Verifique suas permissões.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -149,13 +226,16 @@ const GalleryPage: React.FC = () => {
 
   const handleDelete = async (id: string, title: string) => {
     if (window.confirm(`Tem certeza que deseja remover "${title}" da galeria?`)) {
+      setUploading(true);
       try {
         await deleteDoc(doc(db, 'gallery', id));
-        showMessage('Foto removida da galeria!');
+        showMessage('✅ Foto removida da galeria!');
         setActiveMenuId(null);
       } catch (error) {
         console.error('Erro ao deletar:', error);
-        showMessage('Erro ao remover foto.');
+        showMessage('❌ Erro ao remover foto.');
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -164,12 +244,13 @@ const GalleryPage: React.FC = () => {
     setShowModal(false);
     setEditingItem(null);
     setFormData({ title: '', description: '', url: '' });
+    setUploadProgress('');
   };
 
   return (
     <div className="space-y-6">
       {message && (
-        <div className={`p-4 rounded-lg text-[10px] font-bold uppercase tracking-widest text-center ${message.includes('Erro') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
+        <div className={`p-4 rounded-lg text-sm font-bold text-center ${message.includes('❌') || message.includes('Erro') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
           {message}
         </div>
       )}
@@ -181,7 +262,8 @@ const GalleryPage: React.FC = () => {
         </div>
         <button 
           onClick={() => setShowModal(true)}
-          className="flex items-center justify-center space-x-2 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 shadow-xl shadow-amber-900/20 transition-all"
+          disabled={uploading}
+          className="flex items-center justify-center space-x-2 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 shadow-xl shadow-amber-900/20 transition-all disabled:opacity-50"
         >
           <Plus size={18} />
           <span>Adicionar Foto</span>
@@ -203,6 +285,7 @@ const GalleryPage: React.FC = () => {
                 src={item.url} 
                 alt={item.title} 
                 className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500"
+                loading="lazy"
               />
               
               {/* Overlay */}
@@ -258,12 +341,12 @@ const GalleryPage: React.FC = () => {
             <ImageIcon size={20} className="text-amber-500" />
           </div>
           <div>
-            <h3 className="font-bold text-stone-100 mb-2">Dicas para Fotos da Galeria</h3>
+            <h3 className="font-bold text-stone-100 mb-2">✨ Otimização Automática</h3>
             <ul className="text-stone-400 text-sm space-y-2">
-              <li>• Use imagens de alta qualidade (mínimo 1200x800px)</li>
-              <li>• Formato recomendado: JPG ou PNG</li>
-              <li>• Tamanho máximo: 5MB por imagem</li>
-              <li>• As fotos aparecem automaticamente no site público</li>
+              <li>• <strong>Compressão inteligente:</strong> Imagens são automaticamente otimizadas</li>
+              <li>• <strong>Upload rápido:</strong> Processamento local antes do envio</li>
+              <li>• <strong>Tamanho máximo:</strong> 10MB (comprimido para ~1-2MB)</li>
+              <li>• <strong>Formato:</strong> JPG, PNG ou WEBP</li>
             </ul>
           </div>
         </div>
@@ -277,10 +360,24 @@ const GalleryPage: React.FC = () => {
               <h3 className="font-serif text-xl font-bold text-stone-100">
                 {editingItem ? 'Editar Foto' : 'Adicionar Nova Foto'}
               </h3>
-              <button onClick={closeModal} className="text-stone-500 hover:text-white">
+              <button 
+                onClick={closeModal} 
+                disabled={uploading}
+                className="text-stone-500 hover:text-white disabled:opacity-50"
+              >
                 <X size={20} />
               </button>
             </div>
+
+            {/* Progress Bar */}
+            {uploadProgress && (
+              <div className="mb-6 p-4 rounded-lg bg-amber-600/10 border border-amber-600/20">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="animate-spin text-amber-500" size={20} />
+                  <span className="text-amber-500 font-semibold">{uploadProgress}</span>
+                </div>
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Upload Area */}
@@ -299,7 +396,8 @@ const GalleryPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setFormData({...formData, url: ''})}
-                      className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all"
+                      disabled={uploading}
+                      className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-50"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -319,21 +417,24 @@ const GalleryPage: React.FC = () => {
                     />
                     <label 
                       htmlFor="imageUpload" 
-                      className="cursor-pointer flex flex-col items-center"
+                      className={`cursor-pointer flex flex-col items-center ${uploading ? 'pointer-events-none opacity-50' : ''}`}
                     >
                       {uploading ? (
                         <>
-                          <div className="animate-spin rounded-full h-12 w-12 border-4 border-amber-500 border-t-transparent mb-4"></div>
-                          <p className="text-stone-400 font-semibold">Enviando imagem...</p>
+                          <Loader2 className="animate-spin text-amber-500 mb-4" size={48} />
+                          <p className="text-stone-400 font-semibold">{uploadProgress}</p>
                         </>
                       ) : (
                         <>
                           <Upload size={48} className="text-stone-600 mb-4" />
                           <p className="text-stone-300 font-semibold mb-2">
-                            Clique para selecionar uma imagem
+                            📸 Clique para selecionar uma imagem
                           </p>
                           <p className="text-stone-600 text-sm">
-                            JPG, PNG ou WEBP (máx 5MB)
+                            JPG, PNG ou WEBP (máx 10MB)
+                          </p>
+                          <p className="text-amber-500 text-xs mt-2 font-semibold">
+                            ⚡ Compressão automática ativada
                           </p>
                         </>
                       )}
@@ -350,7 +451,8 @@ const GalleryPage: React.FC = () => {
                     type="url" 
                     value={formData.url}
                     onChange={e => setFormData({...formData, url: e.target.value})}
-                    className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
+                    disabled={uploading}
+                    className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none disabled:opacity-50"
                     placeholder="https://exemplo.com/imagem.jpg"
                   />
                 </div>
@@ -366,7 +468,8 @@ const GalleryPage: React.FC = () => {
                   required
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
-                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
+                  disabled={uploading}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none disabled:opacity-50"
                   placeholder="Ex: Salão Principal, Decoração de Mesa"
                 />
               </div>
@@ -379,8 +482,9 @@ const GalleryPage: React.FC = () => {
                 <textarea 
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
+                  disabled={uploading}
                   rows={3}
-                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none resize-none"
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none resize-none disabled:opacity-50"
                   placeholder="Adicione uma descrição para a foto..."
                 />
               </div>
@@ -390,15 +494,17 @@ const GalleryPage: React.FC = () => {
                 <button 
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 rounded-lg border border-white/10 bg-stone-950 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:bg-stone-800 transition-all"
+                  disabled={uploading}
+                  className="flex-1 rounded-lg border border-white/10 bg-stone-950 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:bg-stone-800 transition-all disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  disabled={uploading}
-                  className="flex-1 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all disabled:opacity-50"
+                  disabled={uploading || !formData.url || !formData.title}
+                  className="flex-1 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
+                  {uploading && <Loader2 className="animate-spin" size={14} />}
                   {editingItem ? 'Salvar Alterações' : 'Adicionar à Galeria'}
                 </button>
               </div>
