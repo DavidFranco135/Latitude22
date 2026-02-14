@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
-import { Save, Camera, Instagram, MessageCircle, Phone, Globe, Sparkles } from 'lucide-react';
+import { Save, Camera, Instagram, MessageCircle, Phone, Globe, Sparkles, Upload, X } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../services/firebase';
 
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<any>({
@@ -16,6 +16,8 @@ const SettingsPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadingHero, setUploadingHero] = useState(false);
+  const [uploadingAbout, setUploadingAbout] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -26,6 +28,42 @@ const SettingsPage: React.FC = () => {
     };
     fetchSettings();
   }, []);
+
+  const handleImageUpload = async (file: File, imageType: 'hero' | 'about') => {
+    if (!file) return;
+
+    const setUploading = imageType === 'hero' ? setUploadingHero : setUploadingAbout;
+    setUploading(true);
+
+    try {
+      // Criar referência no Firebase Storage
+      const timestamp = Date.now();
+      const fileName = `${imageType}-${timestamp}-${file.name}`;
+      const storageRef = ref(storage, `branding/${fileName}`);
+
+      // Upload do arquivo
+      await uploadBytes(storageRef, file);
+
+      // Obter URL de download
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Atualizar o estado com a nova URL
+      if (imageType === 'hero') {
+        setSettings({...settings, heroImage: downloadURL});
+      } else {
+        setSettings({...settings, aboutImage: downloadURL});
+      }
+
+      setMessage('Imagem carregada com sucesso! Não esqueça de salvar.');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      setMessage('Erro ao fazer upload da imagem.');
+      setTimeout(() => setMessage(''), 3000);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -68,33 +106,92 @@ const SettingsPage: React.FC = () => {
               Impacto Visual (Imagens)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Hero Image */}
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Capa Principal (Hero Image)</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img src={settings.heroImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3'} className="h-full w-full object-cover opacity-40 group-hover:opacity-60 transition-all" alt="" />
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
                     <input
                       type="url"
                       value={settings.heroImage}
                       onChange={e => setSettings({...settings, heroImage: e.target.value})}
-                      className="w-4/5 rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
+                      className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
                       placeholder="Coloque a URL da foto..."
                     />
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file, 'hero');
+                          }}
+                          disabled={uploadingHero}
+                        />
+                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                          {uploadingHero ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                              <span>Enviando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={14} />
+                              <span>Upload do Dispositivo</span>
+                            </>
+                          )}
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {/* About Image */}
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Destaque Secundário (Sobre)</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img src={settings.aboutImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622'} className="h-full w-full object-cover opacity-40 group-hover:opacity-60 transition-all" alt="" />
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
                     <input
                       type="url"
                       value={settings.aboutImage}
                       onChange={e => setSettings({...settings, aboutImage: e.target.value})}
-                      className="w-4/5 rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
+                      className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
                       placeholder="URL da imagem secundária..."
                     />
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                      <label className="flex-1 cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file, 'about');
+                          }}
+                          disabled={uploadingAbout}
+                        />
+                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                          {uploadingAbout ? (
+                            <>
+                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
+                              <span>Enviando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload size={14} />
+                              <span>Upload do Dispositivo</span>
+                            </>
+                          )}
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>
