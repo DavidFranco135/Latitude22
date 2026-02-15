@@ -243,10 +243,45 @@ const lancarNoFinanceiro = async (
   };
 
   const handleDelete = async (id: string, client: string) => {
-    if (window.confirm(`Tem certeza que deseja cancelar o agendamento de ${client}?`)) {
+    const appointment = appointments.find(apt => apt.id === id);
+    
+    if (!appointment) {
+      showMessage('Agendamento não encontrado');
+      return;
+    }
+
+    // Verificar se há valores pagos
+    const valorPago = appointment.depositValue || 0;
+    const valorTotal = appointment.totalValue || 0;
+    
+    let confirmMessage = `Tem certeza que deseja cancelar o agendamento de ${client}?`;
+    
+    if (valorPago > 0) {
+      confirmMessage += `\n\nVALOR PAGO: R$ ${valorPago.toFixed(2)}`;
+      confirmMessage += `\n\nAo cancelar, este valor será devolvido (estornado) e deduzido do financeiro.`;
+    }
+    
+    if (window.confirm(confirmMessage)) {
       try {
+        // Se houve pagamento, registrar estorno no financeiro
+        if (valorPago > 0) {
+          await addDoc(collection(db, 'financial'), {
+            description: `ESTORNO - ${appointment.service} (${client})`,
+            amount: valorPago,
+            type: 'expense',
+            date: new Date().toISOString().split('T')[0],
+            category: 'Estorno',
+            createdAt: new Date(),
+            appointmentId: id,
+            appointmentType: 'estorno'
+          });
+          
+          console.log(`💸 Estorno de R$ ${valorPago.toFixed(2)} registrado no financeiro`);
+        }
+        
+        // Deletar o agendamento
         await deleteDoc(doc(db, 'appointments', id));
-        showMessage('Agendamento removido com sucesso!');
+        showMessage(valorPago > 0 ? `Agendamento cancelado e R$ ${valorPago.toFixed(2)} estornado!` : 'Agendamento removido com sucesso!');
         setActiveMenuId(null);
       } catch (error) {
         console.error('Erro ao deletar:', error);
