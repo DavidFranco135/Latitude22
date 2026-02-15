@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '../types';
-import { Bell, Search, User } from 'lucide-react';
+import { Bell, Search, User, Menu } from 'lucide-react';
 
 interface HeaderProps {
   user: UserProfile;
@@ -8,17 +8,26 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
+  const handleMenuClick = () => {
+    console.log('🔘 Botão de menu clicado!');
+    if (onMenuClick) {
+      console.log('✅ onMenuClick existe, executando...');
+      onMenuClick();
+    } else {
+      console.error('❌ onMenuClick não está definido!');
+    }
+  };
+
   return (
     <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-white/5 bg-stone-900 px-4 md:px-8 shadow-md">
       <div className="flex items-center space-x-4">
-        {/* Botão Menu Mobile */}
+        {/* Botão Menu Mobile - CORRIGIDO */}
         <button 
-          onClick={onMenuClick}
-          className="md:hidden p-2 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors"
+          onClick={handleMenuClick}
+          className="md:hidden p-2 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95"
+          aria-label="Abrir menu"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <Menu size={24} strokeWidth={2} />
         </button>
 
         <div className="relative w-full md:w-64">
