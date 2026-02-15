@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, MessageCircle, MapPin, Phone, ChevronRight, Lock, Sparkles, Mail, Calendar } from 'lucide-react';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { Instagram, MessageCircle, MapPin, Phone, ChevronRight, Lock, Sparkles, Mail, Calendar, X } from 'lucide-react';
+import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 const PublicPage: React.FC = () => {
-  const [galleryItems, setGalleryItems] = useState<any[]>([]);
+  const [albums, setAlbums] = useState<any[]>([]);
+  const [photos, setPhotos] = useState<any[]>([]);
+  const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
   const [settings, setSettings] = useState<any>({
-    coverImage: '', // NOVA CAPA
+    coverImage: '',
     heroImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100',
     aboutImage: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80',
     venueTitle: 'LATITUDE22',
@@ -19,6 +21,7 @@ const PublicPage: React.FC = () => {
   });
 
   const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [budgetForm, setBudgetForm] = useState({
     name: '',
     email: '',
@@ -30,58 +33,62 @@ const PublicPage: React.FC = () => {
   });
 
   useEffect(() => {
-    // Busca Galeria
-    const unsubGallery = onSnapshot(
-      collection(db, 'gallery'), 
+    // Busca Álbuns
+    const unsubAlbums = onSnapshot(
+      collection(db, 'albums'),
       (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        if (items.length > 0) setGalleryItems(items);
+        setAlbums(items.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB.getTime() - dateA.getTime();
+        }));
       },
-      (error) => {
-        console.warn("Firestore Gallery error:", error.message);
-        // Fallback items
-        setGalleryItems([
-          { id: '1', url: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=80', title: 'Salão Principal' },
-          { id: '2', url: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80', title: 'Decoração de Mesa' },
-          { id: '3', url: 'https://images.unsplash.com/photo-1464366400600-7168b8af9bc3?auto=format&fit=crop&q=80', title: 'Iluminação Cênica' },
-        ]);
-      }
+      (error) => console.warn("Erro ao carregar álbuns:", error.message)
     );
 
     // Busca Configurações
     const unsubSettings = onSnapshot(
-      doc(db, 'settings', 'general'), 
+      doc(db, 'settings', 'general'),
       (docSnap) => {
         if (docSnap.exists()) {
           setSettings(prev => ({ ...prev, ...docSnap.data() }));
         }
       },
-      (error) => {
-        console.warn("Firestore Settings error:", error.message);
-      }
+      (error) => console.warn("Erro ao carregar configurações:", error.message)
     );
 
     return () => {
-      unsubGallery();
+      unsubAlbums();
       unsubSettings();
     };
   }, []);
 
-  // Função para abrir WhatsApp
+  // Carregar fotos do álbum selecionado
+  useEffect(() => {
+    if (!selectedAlbum) return;
+    
+    const q = query(collection(db, 'photos'), where('albumId', '==', selectedAlbum.id));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPhotos(items);
+    });
+
+    return () => unsubscribe();
+  }, [selectedAlbum]);
+
   const openWhatsApp = () => {
     const phone = settings.whatsapp || '5500000000000';
     const message = encodeURIComponent('Olá! Gostaria de saber mais sobre o espaço e disponibilidade de datas.');
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
   };
 
-  // Função para abrir Instagram
   const openInstagram = () => {
     const instagram = settings.instagram || 'latitude22_';
     const username = instagram.replace('@', '');
     window.open(`https://instagram.com/${username}`, '_blank');
   };
 
-  // Função para enviar email
   const openEmail = () => {
     const email = settings.email || 'contato@latitude22.com';
     const subject = encodeURIComponent('Solicitação de Orçamento');
@@ -89,19 +96,22 @@ const PublicPage: React.FC = () => {
     window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
   };
 
-  // Função para abrir mapa
   const openMap = () => {
     const address = settings.address || 'Latitude22 Eventos';
     const encodedAddress = encodeURIComponent(address);
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
   };
 
-  // Scroll suave
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const openAlbum = (album: any) => {
+    setSelectedAlbum(album);
+    setShowGalleryModal(true);
   };
 
   return (
@@ -177,182 +187,127 @@ const PublicPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Gallery Section */}
-      <section id="galeria" className="py-32 px-4 bg-stone-950">
+      {/* Galeria Section */}
+      <section id="galeria" className="relative py-32 px-4 bg-stone-950">
         <div className="mx-auto max-w-7xl">
-          <div className="text-center mb-20">
-            <span className="text-amber-600 text-[10px] font-bold uppercase tracking-[0.5em]">
-              Experiências Reais
-            </span>
-            <h3 className="mt-4 font-serif text-4xl md:text-6xl text-white">
-              Inspirações Latitude22
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center space-x-2 mb-4 bg-amber-600/20 px-4 py-2 rounded-full border border-amber-600/30">
+              <Sparkles size={14} className="text-amber-500" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-100">
+                Nosso Portfólio
+              </span>
+            </div>
+            <h3 className="font-serif text-4xl md:text-6xl font-bold text-white mb-4">
+              Momentos Inesquecíveis
             </h3>
-            <div className="mt-6 h-px w-24 bg-amber-600/50 mx-auto"></div>
+            <p className="text-stone-400 text-lg max-w-2xl mx-auto">
+              Cada evento é único. Conheça nossos trabalhos e inspire-se.
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {galleryItems.map((item, i) => (
-              <div 
-                key={item.id || i} 
-                className="group relative aspect-[4/5] overflow-hidden rounded-sm bg-stone-900 border border-white/5"
-              >
-                <img 
-                  src={item.url} 
-                  alt={item.title} 
-                  className="h-full w-full object-cover opacity-80 transition-transform duration-1000 group-hover:scale-110 group-hover:opacity-100" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-transparent to-transparent opacity-80"></div>
-                <div className="absolute bottom-8 left-8">
-                  <span className="text-white text-xs font-bold uppercase tracking-[0.3em] block mb-2">
-                    {item.title}
-                  </span>
-                  <div className="h-px w-8 bg-amber-500 transition-all group-hover:w-16"></div>
-                </div>
-              </div>
-            ))}
-          </div>
+
+          {albums.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {albums.map((album) => (
+                <button
+                  key={album.id}
+                  onClick={() => openAlbum(album)}
+                  className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-stone-900 border border-white/5 shadow-2xl hover:border-amber-500/30 transition-all"
+                >
+                  {album.coverUrl ? (
+                    <img 
+                      src={album.coverUrl} 
+                      alt={album.name} 
+                      className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center">
+                      <Sparkles size={48} className="text-stone-700" />
+                    </div>
+                  )}
+                  
+                  <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-all">
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      <h4 className="text-white font-bold text-xl mb-2 uppercase tracking-wide">{album.name}</h4>
+                      {album.description && (
+                        <p className="text-stone-400 text-sm line-clamp-2">{album.description}</p>
+                      )}
+                      <div className="mt-4 flex items-center text-amber-500 text-sm font-bold">
+                        <span>Ver Galeria</span>
+                        <ChevronRight size={16} className="ml-1 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20">
+              <Sparkles size={64} className="mx-auto text-stone-800 mb-4" />
+              <p className="text-stone-600 text-lg">Em breve, nossos álbuns estarão disponíveis aqui.</p>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-32 px-4 bg-stone-900">
+      {/* Contact Section */}
+      <footer id="contato" className="relative border-t border-white/5 bg-stone-950 py-20 px-4">
         <div className="mx-auto max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-            <div className="relative aspect-[4/5] overflow-hidden rounded-sm">
-              <img 
-                src={settings.aboutImage} 
-                alt="Sobre" 
-                className="h-full w-full object-cover" 
-              />
-            </div>
-            <div className="space-y-8">
-              <span className="text-amber-600 text-[10px] font-bold uppercase tracking-[0.5em]">
-                Sobre Nós
-              </span>
-              <h3 className="font-serif text-4xl md:text-5xl text-white leading-tight">
-                Um espaço pensado para celebrar seus momentos
-              </h3>
-              <p className="text-stone-400 text-lg leading-relaxed">
-                Com infraestrutura completa, design sofisticado e equipe especializada, 
-                transformamos cada evento em uma experiência única e memorável.
+          <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <h4 className="mb-6 font-serif text-2xl font-bold tracking-[0.2em] text-white uppercase">{settings.venueTitle}</h4>
+              <p className="text-sm text-stone-500 leading-relaxed">
+                Transformando momentos especiais em memórias eternas desde o primeiro dia.
               </p>
-              <div className="grid grid-cols-2 gap-8 pt-8">
-                <div>
-                  <p className="text-4xl font-bold text-amber-500">500+</p>
-                  <p className="text-sm text-stone-500 uppercase tracking-widest mt-2">Eventos Realizados</p>
-                </div>
-                <div>
-                  <p className="text-4xl font-bold text-amber-500">10+</p>
-                  <p className="text-sm text-stone-500 uppercase tracking-widest mt-2">Anos de Experiência</p>
-                </div>
-              </div>
-              <button 
-                onClick={openWhatsApp}
-                className="inline-flex items-center space-x-3 px-10 py-4 bg-amber-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 transition-all"
-              >
-                <MessageCircle size={16} />
-                <span>Fale Conosco</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer id="contato" className="border-t border-white/5 py-24 bg-stone-900">
-        <div className="mx-auto max-w-7xl px-4 md:px-8">
-          <div className="grid grid-cols-1 gap-20 md:grid-cols-4">
-            <div className="col-span-1">
-              <span className="font-serif text-2xl font-bold tracking-[0.4em] text-white uppercase">
-                {settings.venueTitle}
-              </span>
-              <p className="text-stone-500 text-sm mt-6 leading-relaxed">
-                Cenas inesquecíveis, serviços impecáveis e a exclusividade que seu evento merece.
-              </p>
-              <div className="mt-8 flex space-x-4">
-                <button 
-                  onClick={openInstagram}
-                  className="p-3 bg-stone-950 rounded-full text-amber-600 hover:bg-amber-600 hover:text-white transition-all"
-                  title="Instagram"
-                >
-                  <Instagram size={20} />
-                </button>
-                <button 
-                  onClick={openWhatsApp}
-                  className="p-3 bg-stone-950 rounded-full text-amber-600 hover:bg-amber-600 hover:text-white transition-all"
-                  title="WhatsApp"
-                >
-                  <MessageCircle size={20} />
-                </button>
-                <button 
-                  onClick={openEmail}
-                  className="p-3 bg-stone-950 rounded-full text-amber-600 hover:bg-amber-600 hover:text-white transition-all"
-                  title="Email"
-                >
-                  <Mail size={20} />
-                </button>
-              </div>
             </div>
             
-            <div className="space-y-8">
-              <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">Links Rápidos</h4>
-              <ul className="space-y-4 text-stone-500 text-xs font-medium uppercase tracking-widest">
-                <li>
-                  <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-amber-500 transition-colors">
-                    O Espaço
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('galeria')} className="hover:text-amber-500 transition-colors">
-                    Portfólio
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setShowBudgetModal(true)} className="hover:text-amber-500 transition-colors">
-                    Solicitar Orçamento
-                  </button>
-                </li>
-              </ul>
-            </div>
-            
-            <div className="space-y-8">
-              <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">Onde Estamos</h4>
-              <div className="space-y-4 text-stone-500 text-sm">
-                <button 
-                  onClick={openMap}
-                  className="flex items-start space-x-4 hover:text-amber-500 transition-colors text-left"
-                >
-                  <MapPin size={20} className="text-amber-600 shrink-0" />
-                  <p className="leading-relaxed">
-                    {settings.address || 'Al. das Palmeiras, 222 - Jardins, São Paulo'}
-                  </p>
+            {settings.whatsapp && (
+              <div>
+                <h5 className="mb-4 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-600">Contato Rápido</h5>
+                <button onClick={openWhatsApp} className="group flex items-center space-x-3 text-stone-400 hover:text-white transition-all">
+                  <MessageCircle size={18} className="text-amber-600" />
+                  <span className="text-sm">WhatsApp</span>
                 </button>
-                
-                {settings.whatsapp && (
-                  <button 
-                    onClick={openWhatsApp}
-                    className="flex items-start space-x-4 hover:text-amber-500 transition-colors"
-                  >
-                    <Phone size={20} className="text-amber-600 shrink-0" />
-                    <p className="leading-relaxed">{settings.whatsapp}</p>
+                {settings.email && (
+                  <button onClick={openEmail} className="group flex items-center space-x-3 text-stone-400 hover:text-white transition-all mt-3">
+                    <Mail size={18} className="text-amber-600" />
+                    <span className="text-sm">Email</span>
                   </button>
                 )}
               </div>
-            </div>
+            )}
             
-            <div className="space-y-8">
-              <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">Área do Gestor</h4>
-              <Link 
-                to="/login" 
-                className="inline-flex items-center space-x-3 rounded-sm bg-stone-950 border border-white/5 px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all shadow-2xl"
-              >
-                <Lock size={14} />
-                <span>Entrar no Painel</span>
-              </Link>
-            </div>
+            {settings.instagram && (
+              <div>
+                <h5 className="mb-4 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-600">Redes Sociais</h5>
+                <button onClick={openInstagram} className="group flex items-center space-x-3 text-stone-400 hover:text-white transition-all">
+                  <Instagram size={18} className="text-amber-600" />
+                  <span className="text-sm">{settings.instagram}</span>
+                </button>
+              </div>
+            )}
+            
+            {settings.address && (
+              <div>
+                <h5 className="mb-4 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-600">Localização</h5>
+                <button onClick={openMap} className="group flex items-start space-x-3 text-stone-400 hover:text-white transition-all text-left">
+                  <MapPin size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">{settings.address}</span>
+                </button>
+              </div>
+            )}
           </div>
           
-          <div className="mt-24 pt-8 border-t border-white/5 text-center text-[9px] font-bold uppercase tracking-[0.4em] text-stone-600">
-            &copy; {new Date().getFullYear()} Salão {settings.venueTitle} | Crafted for Excellence
+          <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-[9px] font-bold uppercase tracking-[0.4em] text-stone-600">
+              &copy; {new Date().getFullYear()} Salão {settings.venueTitle} | Crafted for Excellence
+            </div>
+            <Link 
+              to="/login" 
+              className="inline-flex items-center space-x-3 rounded-sm bg-stone-950 border border-white/5 px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:bg-amber-600 hover:text-white hover:border-amber-600 transition-all shadow-2xl"
+            >
+              <Lock size={14} />
+              <span>Entrar no Painel</span>
+            </Link>
           </div>
         </div>
       </footer>
@@ -368,9 +323,9 @@ const PublicPage: React.FC = () => {
               </div>
               <button 
                 onClick={() => setShowBudgetModal(false)} 
-                className="text-stone-500 hover:text-white text-2xl"
+                className="text-stone-500 hover:text-white"
               >
-                ×
+                <X size={24} />
               </button>
             </div>
             
@@ -507,6 +462,60 @@ const PublicPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Galeria */}
+      {showGalleryModal && selectedAlbum && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/95 backdrop-blur-sm p-4">
+          <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="font-serif text-3xl font-bold text-stone-100">{selectedAlbum.name}</h3>
+                {selectedAlbum.description && (
+                  <p className="text-stone-500 text-sm mt-2">{selectedAlbum.description}</p>
+                )}
+              </div>
+              <button 
+                onClick={() => {
+                  setShowGalleryModal(false);
+                  setSelectedAlbum(null);
+                  setPhotos([]);
+                }}
+                className="text-stone-500 hover:text-white"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-stone-950 border border-white/5 shadow-xl hover:border-amber-500/30 transition-all">
+                    <img 
+                      src={photo.url} 
+                      alt={photo.title} 
+                      className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500" 
+                    />
+                    
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h4 className="text-white font-bold text-sm mb-1 uppercase tracking-wide">{photo.title}</h4>
+                        {photo.description && (
+                          <p className="text-stone-400 text-xs line-clamp-2">{photo.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <Sparkles size={64} className="mx-auto text-stone-800 mb-4" />
+                <p className="text-stone-600 text-lg">Nenhuma foto neste álbum ainda.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
