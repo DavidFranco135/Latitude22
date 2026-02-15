@@ -1,13 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, MessageCircle, MapPin, Phone, ChevronRight, Lock, Sparkles, Mail, Calendar, X } from 'lucide-react';
-import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
+import { Instagram, MessageCircle, MapPin, Phone, ChevronRight, Lock, Sparkles, Mail, Calendar, X, ChevronLeft as ChevronLeftIcon, ChevronRight as ChevronRightIcon, Play, Pause } from 'lucide-react';
+import { collection, onSnapshot, doc, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase';
+
+interface SlideItem {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  url?: string;
+  title?: string;
+  description?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  order: number;
+  createdAt?: any;
+}
 
 const PublicPage: React.FC = () => {
   const [albums, setAlbums] = useState<any[]>([]);
   const [photos, setPhotos] = useState<any[]>([]);
   const [selectedAlbum, setSelectedAlbum] = useState<any>(null);
+  const [slides, setSlides] = useState<SlideItem[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [settings, setSettings] = useState<any>({
     coverImage: '',
     heroImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100',
@@ -47,6 +62,16 @@ const PublicPage: React.FC = () => {
       (error) => console.warn("Erro ao carregar álbuns:", error.message)
     );
 
+    // Busca Slides
+    const unsubSlides = onSnapshot(
+      query(collection(db, 'slides'), orderBy('order', 'asc')),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SlideItem));
+        setSlides(items);
+      },
+      (error) => console.warn("Erro ao carregar slides:", error.message)
+    );
+
     // Busca Configurações
     const unsubSettings = onSnapshot(
       doc(db, 'settings', 'general'),
@@ -60,9 +85,21 @@ const PublicPage: React.FC = () => {
 
     return () => {
       unsubAlbums();
+      unsubSlides();
       unsubSettings();
     };
   }, []);
+
+  // Auto-play do slider
+  useEffect(() => {
+    if (!isAutoPlaying || slides.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 5000); // Muda a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, slides.length]);
 
   // Carregar fotos do álbum selecionado
   useEffect(() => {
@@ -112,6 +149,21 @@ const PublicPage: React.FC = () => {
   const openAlbum = (album: any) => {
     setSelectedAlbum(album);
     setShowGalleryModal(true);
+  };
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % slides.length);
+    setIsAutoPlaying(false);
+  };
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
+    setIsAutoPlaying(false);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+    setIsAutoPlaying(false);
   };
 
   return (
@@ -186,6 +238,149 @@ const PublicPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* SLIDER/CARROSSEL - NOVO */}
+      {slides.length > 0 && (
+        <section className="relative bg-stone-950 py-0">
+          <div className="mx-auto max-w-7xl">
+            <div className="relative h-[500px] md:h-[600px] overflow-hidden rounded-2xl border border-white/5 shadow-2xl">
+              {/* Slides */}
+              {slides.map((slide, index) => (
+                <div
+                  key={slide.id}
+                  className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                    index === currentSlide 
+                      ? 'opacity-100 translate-x-0' 
+                      : index < currentSlide 
+                        ? 'opacity-0 -translate-x-full' 
+                        : 'opacity-0 translate-x-full'
+                  }`}
+                >
+                  {slide.type === 'image' && slide.url && (
+                    <div className="relative h-full w-full">
+                      <img 
+                        src={slide.url} 
+                        alt={slide.title || 'Slide'} 
+                        className="h-full w-full object-cover"
+                      />
+                      {(slide.title || slide.description) && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent flex items-end">
+                          <div className="p-8 md:p-16 max-w-3xl">
+                            {slide.title && (
+                              <h3 className="font-serif text-3xl md:text-5xl font-bold text-white mb-4">
+                                {slide.title}
+                              </h3>
+                            )}
+                            {slide.description && (
+                              <p className="text-stone-300 text-lg md:text-xl">
+                                {slide.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {slide.type === 'video' && slide.url && (
+                    <div className="relative h-full w-full bg-stone-950">
+                      <video 
+                        src={slide.url} 
+                        className="h-full w-full object-cover"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                      />
+                      {(slide.title || slide.description) && (
+                        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent flex items-end pointer-events-none">
+                          <div className="p-8 md:p-16 max-w-3xl">
+                            {slide.title && (
+                              <h3 className="font-serif text-3xl md:text-5xl font-bold text-white mb-4">
+                                {slide.title}
+                              </h3>
+                            )}
+                            {slide.description && (
+                              <p className="text-stone-300 text-lg md:text-xl">
+                                {slide.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {slide.type === 'text' && (
+                    <div 
+                      className="h-full w-full flex items-center justify-center p-8 md:p-16"
+                      style={{ 
+                        backgroundColor: slide.backgroundColor || '#0c0a09',
+                        color: slide.textColor || '#e7e5e4'
+                      }}
+                    >
+                      <div className="max-w-4xl text-center">
+                        {slide.title && (
+                          <h3 className="font-serif text-4xl md:text-7xl font-bold mb-8">
+                            {slide.title}
+                          </h3>
+                        )}
+                        {slide.description && (
+                          <p className="text-xl md:text-3xl leading-relaxed opacity-90">
+                            {slide.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Botões de Navegação */}
+              {slides.length > 1 && (
+                <>
+                  <button
+                    onClick={prevSlide}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all backdrop-blur-sm"
+                  >
+                    <ChevronLeftIcon size={24} />
+                  </button>
+                  
+                  <button
+                    onClick={nextSlide}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all backdrop-blur-sm"
+                  >
+                    <ChevronRightIcon size={24} />
+                  </button>
+
+                  {/* Indicadores */}
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center space-x-3">
+                    {slides.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => goToSlide(index)}
+                        className={`h-2 rounded-full transition-all ${
+                          index === currentSlide 
+                            ? 'w-12 bg-amber-600' 
+                            : 'w-2 bg-white/40 hover:bg-white/60'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Botão Play/Pause */}
+                  <button
+                    onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+                    className="absolute bottom-6 right-6 z-10 p-3 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all backdrop-blur-sm"
+                  >
+                    {isAutoPlaying ? <Pause size={16} /> : <Play size={16} />}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Galeria Section */}
       <section id="galeria" className="relative py-32 px-4 bg-stone-950">
