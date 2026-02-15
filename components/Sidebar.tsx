@@ -101,12 +101,29 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
             <>
-              <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
+              {/* Logo Latitude22 */}
+              <img 
+                src="/logo-latitude22.png" 
+                alt="Latitude22" 
+                className="h-16 w-auto object-contain mb-2 drop-shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.src = "/logo-latitude22-neon.svg";
+                }}
+              />
+              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Exclusividade e Requinte</span>
             </>
           )}
           {isCollapsed && (
-            <span className="font-serif text-2xl font-bold text-amber-600">E&F</span>
+            <>
+              <img 
+                src="/logo-latitude22.png" 
+                alt="L22" 
+                className="h-10 w-auto object-contain drop-shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.src = "/logo-latitude22-neon.svg";
+                }}
+              />
+            </>
           )}
           
           {/* Botão de Colapso */}
@@ -191,8 +208,16 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
             flexShrink: 0 
           }}
         >
-          <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-0.5">& Festas</span>
+          {/* Logo Latitude22 Mobile */}
+          <img 
+            src="/logo-latitude22.png" 
+            alt="Latitude22" 
+            className="h-12 w-auto object-contain drop-shadow-lg"
+            onError={(e) => {
+              e.currentTarget.src = "/logo-latitude22-neon.svg";
+            }}
+          />
+          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
           
           {/* Botão Fechar */}
           <button
