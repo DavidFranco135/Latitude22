@@ -118,57 +118,60 @@ const SettingsPage: React.FC = () => {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const compressImage = (file: File): Promise<Blob> => {
+  // FUNÇÃO DE UPLOAD PARA IMGBB - CORRIGIDA
+  // UPLOAD IMGBB - VERSÃO CORRIGIDA E TESTADA
+  const uploadToImgBB = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-          const maxSize = 1920;
-          if (width > maxSize || height > maxSize) {
-            if (width > height) {
-              height = (height / width) * maxSize;
-              width = maxSize;
-            } else {
-              width = (width / height) * maxSize;
-              height = maxSize;
-            }
+      
+      reader.onloadend = async () => {
+        try {
+          setUploadProgress('Enviando para ImgBB...');
+          
+          // Extrai APENAS a parte base64 (remove "data:image/...;base64,")
+          const base64String = (reader.result as string).split(',')[1];
+          
+          if (!base64String) {
+            throw new Error('Falha ao converter imagem');
           }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, width, height);
-          canvas.toBlob((blob) => {
-            if (blob) resolve(blob);
-            else reject(new Error('Erro ao comprimir'));
-          }, 'image/jpeg', 0.85);
-        };
+          
+          const formData = new FormData();
+          formData.append('image', base64String);
+          
+          const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error('Erro ImgBB Response:', errorData);
+            throw new Error(`Falha HTTP: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.success && data.data && data.data.url) {
+            setUploadProgress('');
+            resolve(data.data.url);
+          } else {
+            console.error('Resposta ImgBB:', data);
+            throw new Error('ImgBB não retornou URL válida');
+          }
+        } catch (error) {
+          console.error('Erro no upload:', error);
+          setUploadProgress('');
+          reject(error);
+        }
       };
+      
+      reader.onerror = () => {
+        setUploadProgress('');
+        reject(new Error('Erro ao ler arquivo'));
+      };
+      
+      reader.readAsDataURL(file);
     });
-  };
-
-  const uploadToImgBB = async (file: File): Promise<string> => {
-    setUploadProgress('Comprimindo...');
-    const compressedBlob = await compressImage(file);
-    
-    setUploadProgress('Enviando...');
-    const formData = new FormData();
-    formData.append('image', compressedBlob);
-
-    const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) throw new Error('Erro ao fazer upload');
-
-    const data = await response.json();
-    return data.data.url;
   };
 
   const handleImageUpload = async (file: File, imageType: 'cover' | 'hero' | 'about') => {
