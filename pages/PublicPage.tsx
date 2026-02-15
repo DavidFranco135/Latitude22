@@ -27,7 +27,6 @@ const PublicPage: React.FC = () => {
     coverImage: '',
     heroImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100',
     aboutImage: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80',
-    venueTitle: 'LATITUDE22',
     venueSubtitle: 'Eventos & Festas',
     whatsapp: '',
     instagram: '',
@@ -207,7 +206,7 @@ const PublicPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <img 
             src={settings.coverImage || settings.heroImage} 
-            className="h-full w-full object-cover opacity-60 scale-105" 
+            className="h-full w-full object-cover opacity-40 scale-105" 
             alt="Hero" 
           />
           <div className="absolute inset-0 bg-gradient-to-b from-stone-950/40 via-stone-950/60 to-stone-950"></div>
@@ -220,7 +219,7 @@ const PublicPage: React.FC = () => {
             </span>
           </div>
           <h2 className="mb-8 font-serif text-5xl md:text-8xl text-white leading-tight drop-shadow-2xl">
-            Onde os sonhos se tornam memórias
+            Latitude22
           </h2>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
             <button 
