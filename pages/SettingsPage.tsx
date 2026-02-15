@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
-  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image
+  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
-// API Key do ImgBB
 const IMGBB_API_KEY = '9f8d8580331d26fcb2e3fae394e63b7f';
 
-// Interface para Membros da Equipe
 interface TeamMember {
   id: string;
   name: string;
@@ -20,9 +18,8 @@ interface TeamMember {
 }
 
 const SettingsPage: React.FC = () => {
-  // --- Estados de Configuração Geral ---
   const [settings, setSettings] = useState<any>({
-    coverImage: '', // NOVA CAPA
+    coverImage: '',
     heroImage: '',
     aboutImage: '',
     venueTitle: 'LATITUDE22',
@@ -36,8 +33,8 @@ const SettingsPage: React.FC = () => {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingAbout, setUploadingAbout] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
-  // --- Estados da Equipe ---
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
@@ -47,9 +44,6 @@ const SettingsPage: React.FC = () => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // --- Effects ---
-
-  // Carregar Configurações
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -59,32 +53,19 @@ const SettingsPage: React.FC = () => {
         }
       } catch (error) {
         console.error('Erro ao carregar configurações:', error);
-        setMessage('Erro ao carregar configurações. Verifique suas permissões.');
       }
     };
     fetchSettings();
   }, []);
 
-  // Carregar Equipe (Real-time)
   useEffect(() => {
-    try {
-      const unsub = onSnapshot(
-        collection(db, 'team'), 
-        (snapshot) => {
-          const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamMember));
-          setTeamMembers(members);
-        },
-        (error) => {
-          console.error('Erro ao carregar equipe:', error);
-        }
-      );
-      return () => unsub();
-    } catch (error) {
-      console.error('Erro ao configurar listener da equipe:', error);
-    }
+    const unsub = onSnapshot(collection(db, 'team'), (snapshot) => {
+      const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamMember));
+      setTeamMembers(members);
+    });
+    return () => unsub();
   }, []);
 
-  // Fechar menu de 3 pontinhos ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -95,20 +76,59 @@ const SettingsPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // --- Funções de Upload com ImgBB ---
+  const showMessage = (msg: string) => {
+    setMessage(msg);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxSize = 1920;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Erro ao comprimir'));
+          }, 'image/jpeg', 0.85);
+        };
+      };
+    });
+  };
 
   const uploadToImgBB = async (file: File): Promise<string> => {
+    setUploadProgress('Comprimindo...');
+    const compressedBlob = await compressImage(file);
+    
+    setUploadProgress('Enviando...');
     const formData = new FormData();
-    formData.append('image', file);
+    formData.append('image', compressedBlob);
 
     const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
       method: 'POST',
       body: formData,
     });
 
-    if (!response.ok) {
-      throw new Error('Erro ao fazer upload da imagem');
-    }
+    if (!response.ok) throw new Error('Erro ao fazer upload');
 
     const data = await response.json();
     return data.data.url;
@@ -117,17 +137,13 @@ const SettingsPage: React.FC = () => {
   const handleImageUpload = async (file: File, imageType: 'cover' | 'hero' | 'about') => {
     if (!file) return;
 
-    // Validar tipo de arquivo
     if (!file.type.startsWith('image/')) {
-      setMessage('Erro: Por favor, selecione uma imagem válida.');
-      setTimeout(() => setMessage(''), 3000);
+      showMessage('❌ Erro: Selecione uma imagem válida.');
       return;
     }
 
-    // Validar tamanho (máx 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage('Erro: Imagem muito grande. Use imagens menores que 5MB.');
-      setTimeout(() => setMessage(''), 3000);
+    if (file.size > 10 * 1024 * 1024) {
+      showMessage('❌ Erro: Imagem muito grande. Máximo 10MB.');
       return;
     }
 
@@ -135,30 +151,21 @@ const SettingsPage: React.FC = () => {
     setUploading(true);
 
     try {
-      // Upload para ImgBB
       const imageUrl = await uploadToImgBB(file);
-
-      // Atualizar estado local
       const newSettings = { ...settings };
-      if (imageType === 'cover') {
-        newSettings.coverImage = imageUrl;
-      } else if (imageType === 'hero') {
-        newSettings.heroImage = imageUrl;
-      } else {
-        newSettings.aboutImage = imageUrl;
-      }
+      if (imageType === 'cover') newSettings.coverImage = imageUrl;
+      else if (imageType === 'hero') newSettings.heroImage = imageUrl;
+      else newSettings.aboutImage = imageUrl;
       
       setSettings(newSettings);
-
-      // Salvar diretamente no Firestore
       await setDoc(doc(db, 'settings', 'general'), newSettings, { merge: true });
-
-      setMessage('Imagem carregada e salva com sucesso!');
-      setTimeout(() => setMessage(''), 3000);
+      
+      setUploadProgress('');
+      showMessage('✅ Imagem carregada e salva!');
     } catch (error) {
-      console.error('Erro ao fazer upload:', error);
-      setMessage('Erro ao enviar imagem. Tente novamente.');
-      setTimeout(() => setMessage(''), 3000);
+      console.error('Erro:', error);
+      setUploadProgress('');
+      showMessage('❌ Erro ao enviar imagem.');
     } finally {
       setUploading(false);
     }
@@ -166,42 +173,34 @@ const SettingsPage: React.FC = () => {
 
   const handleSaveSettings = async () => {
     setLoading(true);
-    setMessage('');
     try {
       await setDoc(doc(db, 'settings', 'general'), settings, { merge: true });
-      setMessage('Identidade atualizada com sucesso!');
-      setTimeout(() => setMessage(''), 3000);
+      showMessage('✅ Configurações salvas!');
     } catch (err) {
-      console.error('Erro ao salvar:', err);
-      setMessage('Erro ao salvar configurações. Verifique suas permissões.');
-      setTimeout(() => setMessage(''), 3000);
+      console.error('Erro:', err);
+      showMessage('❌ Erro ao salvar.');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- Funções de Gestão de Equipe ---
-
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) {
-      setMessage('Preencha nome e email!');
-      setTimeout(() => setMessage(''), 3000);
+      showMessage('❌ Preencha nome e email!');
       return;
     }
 
     try {
       if (editingMember) {
-        // Editar existente
         await updateDoc(doc(db, 'team', editingMember.id), {
           name: newMember.name,
           role: newMember.role || '',
           email: newMember.email,
           photoUrl: newMember.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newMember.name)}`
         });
-        setMessage('Membro atualizado!');
+        showMessage('✅ Membro atualizado!');
       } else {
-        // Criar novo
         await addDoc(collection(db, 'team'), {
           name: newMember.name,
           role: newMember.role || '',
@@ -210,28 +209,24 @@ const SettingsPage: React.FC = () => {
           createdAt: new Date(),
           hasAccess: false
         });
-        setMessage('Membro adicionado!');
+        showMessage('✅ Membro adicionado!');
       }
       closeModal();
-      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      console.error("Erro ao salvar membro:", error);
-      setMessage('Erro ao salvar membro. Verifique suas permissões.');
-      setTimeout(() => setMessage(''), 3000);
+      console.error("Erro:", error);
+      showMessage('❌ Erro ao salvar.');
     }
   };
 
   const handleDeleteMember = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este membro da equipe?')) {
+    if (window.confirm('Remover este membro?')) {
       try {
         await deleteDoc(doc(db, 'team', id));
         setActiveMenuId(null);
-        setMessage('Membro removido!');
-        setTimeout(() => setMessage(''), 3000);
+        showMessage('✅ Membro removido!');
       } catch (error) {
-        console.error("Erro ao deletar membro:", error);
-        setMessage('Erro ao remover membro.');
-        setTimeout(() => setMessage(''), 3000);
+        console.error("Erro:", error);
+        showMessage('❌ Erro ao remover.');
       }
     }
   };
@@ -242,12 +237,10 @@ const SettingsPage: React.FC = () => {
         hasAccess: !member.hasAccess
       });
       setActiveMenuId(null);
-      setMessage(member.hasAccess ? 'Acesso revogado!' : 'Acesso liberado!');
-      setTimeout(() => setMessage(''), 3000);
+      showMessage(member.hasAccess ? '✅ Acesso revogado!' : '✅ Acesso liberado!');
     } catch (error) {
-      console.error("Erro ao alterar acesso", error);
-      setMessage('Erro ao alterar acesso.');
-      setTimeout(() => setMessage(''), 3000);
+      console.error("Erro", error);
+      showMessage('❌ Erro ao alterar.');
     }
   };
 
@@ -276,28 +269,28 @@ const SettingsPage: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-amber-600 mb-1">
             <Sparkles size={16} />
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Branding & Visual</span>
+            <span className="text-xs font-bold uppercase tracking-widest">Branding & Visual</span>
           </div>
           <h2 className="font-serif text-4xl font-bold text-stone-100 tracking-tight">Personalização do Site</h2>
         </div>
       </div>
 
       {message && (
-        <div className={`p-4 rounded-lg text-[10px] font-bold uppercase tracking-widest text-center animate-bounce ${message.includes('Erro') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
+        <div className={`p-4 rounded-lg text-xs font-bold uppercase tracking-widest text-center ${message.includes('❌') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
           {message}
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
-          {/* NOVA SEÇÃO: Capa da Página Pública */}
+          {/* CAPA */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <h3 className="mb-8 font-bold text-stone-100 flex items-center">
               <Image size={18} className="mr-2 text-amber-500" />
               Capa da Página Pública (Banner Principal)
             </h3>
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">
+              <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">
                 Imagem de Capa (Recomendado: 1920x600px)
               </label>
               <div className="relative group aspect-[16/5] rounded-xl overflow-hidden bg-stone-950 border border-white/5">
@@ -312,10 +305,10 @@ const SettingsPage: React.FC = () => {
                     value={settings.coverImage}
                     onChange={e => setSettings({...settings, coverImage: e.target.value})}
                     className="w-full max-w-xl rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                    placeholder="Coloque a URL da capa..."
+                    placeholder="URL da capa..."
                   />
                   <div className="flex items-center gap-2 w-full max-w-xl">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
                     <label className="flex-1 cursor-pointer">
                       <input
                         type="file"
@@ -327,16 +320,16 @@ const SettingsPage: React.FC = () => {
                         }}
                         disabled={uploadingCover}
                       />
-                      <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                      <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
                         {uploadingCover ? (
                           <>
-                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
-                            <span>Enviando...</span>
+                            <Loader2 className="animate-spin" size={14} />
+                            <span>{uploadProgress}</span>
                           </>
                         ) : (
                           <>
                             <Upload size={14} />
-                            <span>Upload da Capa (máx 5MB)</span>
+                            <span>Upload Capa</span>
                           </>
                         )}
                       </div>
@@ -347,16 +340,16 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Branding Images */}
+          {/* Hero e About */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <h3 className="mb-8 font-bold text-stone-100 flex items-center">
               <Camera size={18} className="mr-2 text-amber-500" />
               Imagens de Impacto Visual
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Hero Image */}
+              {/* Hero */}
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Seção Hero (Principal)</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">Seção Hero</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img 
                     src={settings.heroImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3'} 
@@ -369,10 +362,10 @@ const SettingsPage: React.FC = () => {
                       value={settings.heroImage}
                       onChange={e => setSettings({...settings, heroImage: e.target.value})}
                       className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="URL da imagem..."
+                      placeholder="URL..."
                     />
                     <div className="flex items-center gap-2 w-full">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
                       <label className="flex-1 cursor-pointer">
                         <input
                           type="file"
@@ -384,16 +377,16 @@ const SettingsPage: React.FC = () => {
                           }}
                           disabled={uploadingHero}
                         />
-                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
                           {uploadingHero ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
-                              <span>Enviando...</span>
+                              <Loader2 className="animate-spin" size={14} />
+                              <span>{uploadProgress}</span>
                             </>
                           ) : (
                             <>
                               <Upload size={14} />
-                              <span>Upload (máx 5MB)</span>
+                              <span>Upload</span>
                             </>
                           )}
                         </div>
@@ -403,9 +396,9 @@ const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* About Image */}
+              {/* About */}
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500 block">Seção Sobre Nós</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">Seção Sobre</label>
                 <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
                   <img 
                     src={settings.aboutImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622'} 
@@ -418,10 +411,10 @@ const SettingsPage: React.FC = () => {
                       value={settings.aboutImage}
                       onChange={e => setSettings({...settings, aboutImage: e.target.value})}
                       className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="URL da imagem..."
+                      placeholder="URL..."
                     />
                     <div className="flex items-center gap-2 w-full">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-stone-500">ou</span>
+                      <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
                       <label className="flex-1 cursor-pointer">
                         <input
                           type="file"
@@ -433,16 +426,16 @@ const SettingsPage: React.FC = () => {
                           }}
                           disabled={uploadingAbout}
                         />
-                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
                           {uploadingAbout ? (
                             <>
-                              <div className="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></div>
-                              <span>Enviando...</span>
+                              <Loader2 className="animate-spin" size={14} />
+                              <span>{uploadProgress}</span>
                             </>
                           ) : (
                             <>
                               <Upload size={14} />
-                              <span>Upload (máx 5MB)</span>
+                              <span>Upload</span>
                             </>
                           )}
                         </div>
@@ -454,13 +447,13 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Identity & Socials */}
+          {/* Identidade */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <h3 className="mb-6 font-bold text-stone-100">Identidade & Contatos</h3>
             
             <div className="space-y-6">
               <div className="flex items-center gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 w-32">Nome do Venue</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-stone-500 w-32">Nome do Venue</span>
                 <input
                   type="text"
                   value={settings.venueTitle}
@@ -471,7 +464,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 w-32">Segmento</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-stone-500 w-32">Segmento</span>
                 <input
                   type="text"
                   value={settings.venueSubtitle}
@@ -519,7 +512,7 @@ const SettingsPage: React.FC = () => {
               <button 
                 onClick={handleSaveSettings}
                 disabled={loading}
-                className="flex items-center justify-center space-x-3 rounded-lg bg-amber-600 px-10 py-4 text-[10px] font-bold uppercase tracking-[0.2em] text-white hover:bg-amber-700 shadow-2xl shadow-amber-900/40 disabled:opacity-50 transition-all hover:-translate-y-1"
+                className="flex items-center justify-center space-x-3 rounded-lg bg-amber-600 px-10 py-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 shadow-2xl shadow-amber-900/40 disabled:opacity-50 transition-all"
               >
                 <Save size={16} />
                 <span>{loading ? 'Salvando...' : 'Salvar Configurações'}</span>
@@ -528,7 +521,7 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Coluna Direita: Equipe & Acesso */}
+        {/* Equipe */}
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
@@ -539,7 +532,6 @@ const SettingsPage: React.FC = () => {
               <button 
                 onClick={() => setShowMemberModal(true)}
                 className="p-2 rounded-full bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white transition-all"
-                title="Adicionar Membro"
               >
                 <span className="text-xl font-bold leading-none">+</span>
               </button>
@@ -560,7 +552,7 @@ const SettingsPage: React.FC = () => {
                     />
                     <div>
                       <p className="text-sm font-bold text-stone-200">{member.name}</p>
-                      <p className="text-[10px] uppercase tracking-wider text-stone-500">{member.role}</p>
+                      <p className="text-xs uppercase tracking-wider text-stone-500">{member.role}</p>
                     </div>
                   </div>
 
@@ -574,41 +566,38 @@ const SettingsPage: React.FC = () => {
 
                     {activeMenuId === member.id && (
                       <div ref={menuRef} className="absolute right-0 top-8 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
-                        <div className="py-1">
-                          <button 
-                            onClick={() => openEditModal(member)}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
-                          >
-                            <Edit2 size={12} /> Editar
-                          </button>
-                          
-                          <button 
-                            onClick={() => toggleAccess(member)}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
-                          >
-                            {member.hasAccess ? (
-                              <><Ban size={12} className="text-red-400" /> Revogar</>
-                            ) : (
-                              <><CheckCircle size={12} className="text-green-400" /> Liberar</>
-                            )}
-                          </button>
+                        <button 
+                          onClick={() => openEditModal(member)}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                        >
+                          <Edit2 size={12} /> Editar
+                        </button>
+                        
+                        <button 
+                          onClick={() => toggleAccess(member)}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                        >
+                          {member.hasAccess ? (
+                            <><Ban size={12} className="text-red-400" /> Revogar</>
+                          ) : (
+                            <><CheckCircle size={12} className="text-green-400" /> Liberar</>
+                          )}
+                        </button>
 
-                          <div className="h-px bg-white/10 my-1"></div>
+                        <div className="h-px bg-white/10"></div>
 
-                          <button 
-                            onClick={() => handleDeleteMember(member.id)}
-                            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10"
-                          >
-                            <Trash2 size={12} /> Excluir
-                          </button>
-                        </div>
+                        <button 
+                          onClick={() => handleDeleteMember(member.id)}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10"
+                        >
+                          <Trash2 size={12} /> Excluir
+                        </button>
                       </div>
                     )}
                   </div>
                   
                   <div 
                     className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-stone-900 ${member.hasAccess ? 'bg-green-500' : 'bg-stone-600'}`} 
-                    title={member.hasAccess ? "Acesso Permitido" : "Sem Acesso"}
                   ></div>
                 </div>
               ))}
@@ -617,7 +606,7 @@ const SettingsPage: React.FC = () => {
             <div className="mt-8 pt-6 border-t border-white/5">
               <div className="flex items-start gap-2">
                 <Shield size={14} className="text-amber-600 mt-1" />
-                <p className="text-[10px] text-stone-500 leading-relaxed">
+                <p className="text-xs text-stone-500 leading-relaxed">
                   Membros com <span className="text-green-500 font-bold">Acesso Liberado</span> podem gerenciar conteúdo.
                 </p>
               </div>
@@ -626,7 +615,7 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal Adicionar/Editar Membro */}
+      {/* Modal Membro */}
       {showMemberModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-950/90 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-6">
@@ -641,9 +630,7 @@ const SettingsPage: React.FC = () => {
             
             <form onSubmit={handleSaveMember} className="space-y-4">
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                  Nome Completo *
-                </label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-1 block">Nome *</label>
                 <input 
                   type="text" 
                   required
@@ -655,9 +642,7 @@ const SettingsPage: React.FC = () => {
               </div>
               
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                  Cargo / Função
-                </label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-1 block">Cargo</label>
                 <input 
                   type="text" 
                   value={newMember.role}
@@ -668,9 +653,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                  E-mail de Acesso *
-                </label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-1 block">E-mail *</label>
                 <input 
                   type="email" 
                   required
@@ -682,9 +665,7 @@ const SettingsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                  URL da Foto (Opcional)
-                </label>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-1 block">URL da Foto</label>
                 <input 
                   type="url" 
                   value={newMember.photoUrl}
@@ -697,7 +678,7 @@ const SettingsPage: React.FC = () => {
               <div className="pt-4">
                 <button 
                   type="submit"
-                  className="w-full rounded-lg bg-amber-600 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all"
+                  className="w-full rounded-lg bg-amber-600 py-3 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all"
                 >
                   {editingMember ? 'Salvar' : 'Adicionar'}
                 </button>
