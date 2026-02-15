@@ -9,10 +9,15 @@ interface Appointment {
   client: string;
   clientId?: string;
   service: string;
-  status: 'confirmado' | 'pendente' | 'concluido' | 'cancelado';
+  status: 'confirmado' | 'pendente' | 'concluido' | 'cancelado' | 'pago';
   date: string;
   notes?: string;
   createdAt?: any;
+  // NOVOS CAMPOS
+  totalValue?: number;
+  depositValue?: number;
+  remainingValue?: number;
+  paymentDate?: string;
 }
 
 interface Client {
@@ -37,14 +42,17 @@ const AgendaPage: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
-    time: '',
-    client: '',
-    clientId: '',
-    service: '',
-    status: 'pendente' as 'confirmado' | 'pendente' | 'concluido' | 'cancelado',
-    date: new Date().toISOString().split('T')[0],
-    notes: ''
-  });
+  time: '',
+  client: '',
+  clientId: '',
+  service: '',
+  status: 'pendente' as 'confirmado' | 'pendente' | 'concluido' | 'cancelado' | 'pago',
+  date: new Date().toISOString().split('T')[0],
+  notes: '',
+  totalValue: 0,
+  depositValue: 0,
+  remainingValue: 0
+});
 
   const [newClientForm, setNewClientForm] = useState({
     name: '',
@@ -101,32 +109,97 @@ const AgendaPage: React.FC = () => {
     setMessage(msg);
     setTimeout(() => setMessage(''), 3000);
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.time || !formData.client || !formData.service) {
-      showMessage('Erro: Preencha todos os campos obrigatórios');
+  // Função para lançar valores no financeiro
+const lancarNoFinanceiro = async (
+  appointment: Appointment, 
+  tipo: 'entrada' | 'pagamento_total',
+  valor: number
+) => {
+  try {
+    if (!valor || valor <= 0) {
+      console.log('Valor zerado, não lança no financeiro');
       return;
     }
 
-    try {
-      if (editingAppointment) {
-        await updateDoc(doc(db, 'appointments', editingAppointment.id), formData);
-        showMessage('Agendamento atualizado com sucesso!');
-      } else {
-        await addDoc(collection(db, 'appointments'), {
-          ...formData,
-          createdAt: new Date()
-        });
-        showMessage('Agendamento criado com sucesso!');
+    await addDoc(collection(db, 'financial'), {
+      description: tipo === 'entrada' 
+        ? `Entrada - ${appointment.service} (${appointment.client})`
+        : `Pagamento Final - ${appointment.service} (${appointment.client})`,
+      amount: valor,
+      type: 'income',
+      date: appointment.date,
+      category: tipo === 'entrada' ? 'Reserva' : 'Evento',
+      createdAt: new Date(),
+      appointmentId: appointment.id,
+      appointmentType: tipo
+    });
+
+    console.log(`✅ R$ ${valor.toFixed(2)} lançado no financeiro (${tipo})`);
+    showMessage(`💰 R$ ${valor.toFixed(2)} registrado no financeiro!`);
+  } catch (error) {
+    console.error('Erro ao lançar no financeiro:', error);
+  }
+};
+
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!formData.time || !formData.client || !formData.service || !formData.date) {
+    showMessage('Preencha todos os campos obrigatórios!');
+    return;
+  }
+
+  try {
+    const totalValue = parseFloat(String(formData.totalValue)) || 0;
+    const depositValue = parseFloat(String(formData.depositValue)) || 0;
+
+    const appointmentData = {
+      ...formData,
+      totalValue,
+      depositValue,
+      remainingValue: totalValue - depositValue,
+      createdAt: new Date()
+    };
+
+    if (editingAppointment) {
+      // EDITANDO
+      await updateDoc(doc(db, 'appointments', editingAppointment.id), appointmentData);
+      showMessage('Agendamento atualizado!');
+    } else {
+      // CRIANDO NOVO
+      const docRef = await addDoc(collection(db, 'appointments'), appointmentData);
+      
+      // Se tiver valor de entrada, lança no financeiro
+      if (depositValue > 0) {
+        await lancarNoFinanceiro(
+          { ...appointmentData, id: docRef.id } as Appointment, 
+          'entrada',
+          depositValue
+        );
       }
-      closeModal();
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
-      showMessage('Erro ao salvar agendamento');
+      
+      showMessage('Agendamento criado com sucesso!');
     }
-  };
+
+    setShowModal(false);
+    setEditingAppointment(null);
+    setFormData({
+      time: '',
+      client: '',
+      clientId: '',
+      service: '',
+      status: 'pendente',
+      date: new Date().toISOString().split('T')[0],
+      notes: '',
+      totalValue: 0,
+      depositValue: 0,
+      remainingValue: 0
+    });
+  } catch (error) {
+    console.error('Erro:', error);
+    showMessage('Erro ao salvar agendamento');
+  }
+};
 
   const handleNewClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -543,6 +616,58 @@ const AgendaPage: React.FC = () => {
                   </select>
                 </div>
               </div>
+              {/* VALOR TOTAL */}
+<div>
+  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+    💰 Valor Total (R$)
+  </label>
+  <input
+    type="number"
+    value={formData.totalValue}
+    onChange={(e) => {
+      const total = parseFloat(e.target.value) || 0;
+      const deposit = parseFloat(String(formData.depositValue)) || 0;
+      setFormData({
+        ...formData, 
+        totalValue: total,
+        remainingValue: total - deposit
+      });
+    }}
+    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+    placeholder="0,00"
+    step="0.01"
+    min="0"
+  />
+</div>
+
+{/* VALOR DE ENTRADA */}
+<div>
+  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+    💵 Valor de Entrada/Sinal (R$)
+  </label>
+  <input
+    type="number"
+    value={formData.depositValue}
+    onChange={(e) => {
+      const deposit = parseFloat(e.target.value) || 0;
+      const total = parseFloat(String(formData.totalValue)) || 0;
+      setFormData({
+        ...formData, 
+        depositValue: deposit,
+        remainingValue: total - deposit
+      });
+    }}
+    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+    placeholder="0,00"
+    step="0.01"
+    min="0"
+  />
+  {formData.totalValue > 0 && (
+    <p className="text-xs text-amber-400 mt-1">
+      Restante a pagar: R$ {((formData.totalValue || 0) - (formData.depositValue || 0)).toFixed(2)}
+    </p>
+  )}
+</div>
 
               <div>
                 <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
