@@ -123,7 +123,7 @@ const PublicPage: React.FC = () => {
   const openInstagram = () => {
     const instagram = settings.instagram || 'latitude22_';
     const username = instagram.replace('@', '');
-    window.open(`https://instagram.com/${username}`, '_blank');
+    window.open(`${username}`, '_blank');
   };
 
   const openEmail = () => {
