@@ -387,8 +387,8 @@ const GalleryPage: React.FC = () => {
             </div>
           ) : (
             photos.map((photo) => (
-              <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-stone-900 border border-white/5 shadow-xl hover:border-amber-500/30 transition-all">
-                <img src={photo.url} alt={photo.title} className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500" loading="lazy" />
+              <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-stone-950 border border-white/5 shadow-xl hover:border-amber-500/30 transition-all">
+                <img src={photo.url} alt={photo.title} className="h-full w-full object-contain opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500" loading="lazy" />
                 
                 <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-all">
                   <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -473,7 +473,7 @@ const GalleryPage: React.FC = () => {
                 
                 {photoForm.url ? (
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
-                    <img src={photoForm.url} alt="Preview" className="h-full w-full object-cover" />
+                    <img src={photoForm.url} alt="Preview" className="h-full w-full object-contain" />
                     <button type="button" onClick={() => setPhotoForm({...photoForm, url: ''})} disabled={uploading} className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all">
                       <Trash2 size={16} />
                     </button>
