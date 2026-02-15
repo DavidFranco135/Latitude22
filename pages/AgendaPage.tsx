@@ -39,6 +39,7 @@ const AgendaPage: React.FC = () => {
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'day' | 'all'>('day');
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
@@ -251,13 +252,16 @@ const lancarNoFinanceiro = async (
     }
 
     // Verificar se há valores pagos
-    const valorPago = appointment.depositValue || 0;
-    const valorTotal = appointment.totalValue || 0;
+    // Se status é 'pago', estornar o valor total
+    // Senão, estornar apenas a entrada (depositValue)
+    const valorPago = appointment.status === 'pago' 
+      ? (appointment.totalValue || 0) 
+      : (appointment.depositValue || 0);
     
     let confirmMessage = `Tem certeza que deseja cancelar o agendamento de ${client}?`;
     
     if (valorPago > 0) {
-      confirmMessage += `\n\nVALOR PAGO: R$ ${valorPago.toFixed(2)}`;
+      confirmMessage += `\n\n${appointment.status === 'pago' ? 'VALOR TOTAL PAGO' : 'VALOR DE ENTRADA'}: R$ ${valorPago.toFixed(2)}`;
       confirmMessage += `\n\nAo cancelar, este valor será devolvido (estornado) e deduzido do financeiro.`;
     }
     
@@ -357,7 +361,7 @@ const lancarNoFinanceiro = async (
     const matchesMonth = filterMonth ? (appDate.getMonth() + 1) === parseInt(filterMonth) : true;
     const matchesYear = filterYear ? appDate.getFullYear() === parseInt(filterYear) : true;
     const matchesSearch = searchTerm ? app.client.toLowerCase().includes(searchTerm.toLowerCase()) : true;
-    const matchesSelectedDate = app.date === formData.date;
+    const matchesSelectedDate = viewMode === 'day' ? app.date === formData.date : true;
     
     return matchesMonth && matchesYear && matchesSearch && matchesSelectedDate;
   });
@@ -434,41 +438,80 @@ const lancarNoFinanceiro = async (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
+
+          {/* Botões de Visualização */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                viewMode === 'day'
+                  ? 'bg-amber-600 text-white'
+                  : 'border border-white/10 bg-stone-950 text-stone-500 hover:text-amber-500'
+              }`}
+            >
+              Dia
+            </button>
+            <button
+              onClick={() => setViewMode('all')}
+              className={`px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                viewMode === 'all'
+                  ? 'bg-amber-600 text-white'
+                  : 'border border-white/10 bg-stone-950 text-stone-500 hover:text-amber-500'
+              }`}
+            >
+              Todos
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Calendário */}
       <div className="rounded-xl border border-white/5 bg-stone-900 shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-white/5 p-6">
-          <button onClick={goToPrevDay} className="p-2 rounded-lg hover:bg-white/5 text-stone-500 hover:text-white transition-all">
-            <ChevronLeft size={20} />
-          </button>
-          
-          <div className="text-center">
+        {viewMode === 'day' && (
+          <div className="flex items-center justify-between border-b border-white/5 p-6">
+            <button onClick={goToPrevDay} className="p-2 rounded-lg hover:bg-white/5 text-stone-500 hover:text-white transition-all">
+              <ChevronLeft size={20} />
+            </button>
+            
+            <div className="text-center">
+              <h3 className="font-bold text-xl text-white uppercase tracking-tight">
+                {new Date(formData.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </h3>
+              <p className="text-xs text-stone-500 mt-1 uppercase tracking-widest">
+                {new Date(formData.date).toLocaleDateString('pt-BR', { weekday: 'long' })}
+              </p>
+            </div>
+            
+            <button onClick={goToNextDay} className="p-2 rounded-lg hover:bg-white/5 text-stone-500 hover:text-white transition-all">
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
+        {viewMode === 'all' && (
+          <div className="border-b border-white/5 p-6">
             <h3 className="font-bold text-xl text-white uppercase tracking-tight">
-              {new Date(formData.date).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              Todos os Agendamentos
             </h3>
             <p className="text-xs text-stone-500 mt-1 uppercase tracking-widest">
-              {new Date(formData.date).toLocaleDateString('pt-BR', { weekday: 'long' })}
+              {filteredAppointments.length} agendamento(s) encontrado(s)
             </p>
           </div>
-          
-          <button onClick={goToNextDay} className="p-2 rounded-lg hover:bg-white/5 text-stone-500 hover:text-white transition-all">
-            <ChevronRight size={20} />
-          </button>
-        </div>
+        )}
 
         <div className="p-6">
-          <div className="grid gap-2">
-            {hours.map(hour => {
-              const appointment = filteredAppointments.find(app => app.time === hour);
-              return (
-                <div key={hour} className="relative group">
-                  <div className="flex items-start gap-4">
-                    <div className="w-20 pt-2 text-right">
-                      <span className="text-xs font-bold text-stone-600 uppercase tracking-widest">{hour}</span>
-                    </div>
-                    {appointment ? (
+          {viewMode === 'day' ? (
+            // Visualização por horário (modo dia)
+            <div className="grid gap-2">
+              {hours.map(hour => {
+                const appointment = filteredAppointments.find(app => app.time === hour);
+                return (
+                  <div key={hour} className="relative group">
+                    <div className="flex items-start gap-4">
+                      <div className="w-20 pt-2 text-right">
+                        <span className="text-xs font-bold text-stone-600 uppercase tracking-widest">{hour}</span>
+                      </div>
+                      {appointment ? (
                       <div className={`flex-1 rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative group hover:shadow-lg transition-all`}>
                         <div className="relative z-10">
                           <div className="flex items-start justify-between">
@@ -603,6 +646,143 @@ const lancarNoFinanceiro = async (
               );
             })}
           </div>
+          ) : (
+            // Visualização de lista (modo todos)
+            <div className="space-y-4">
+              {filteredAppointments.length === 0 ? (
+                <div className="text-center py-12 text-stone-600">
+                  <CalendarIcon size={48} className="mx-auto mb-4 opacity-20" />
+                  <p className="text-sm">Nenhum agendamento encontrado</p>
+                </div>
+              ) : (
+                filteredAppointments
+                  .sort((a, b) => {
+                    const dateCompare = new Date(a.date).getTime() - new Date(b.date).getTime();
+                    if (dateCompare !== 0) return dateCompare;
+                    return a.time.localeCompare(b.time);
+                  })
+                  .map((appointment) => (
+                    <div key={appointment.id} className={`rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative group hover:shadow-lg transition-all`}>
+                      <div className="relative z-10">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="text-xs font-bold text-stone-400 bg-stone-950/50 px-3 py-1 rounded-lg">
+                                {new Date(appointment.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} • {appointment.time}
+                              </div>
+                              <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border ${getStatusBadge(appointment.status)}`}>
+                                {appointment.status}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-white uppercase tracking-tight mb-1">{appointment.client}</h4>
+                            <p className="text-xs text-stone-500 mt-2 font-medium">{appointment.service}</p>
+                            {appointment.notes && (
+                              <p className="text-xs text-stone-600 mt-1 italic">{appointment.notes}</p>
+                            )}
+                            
+                            {/* Informações Financeiras */}
+                            {appointment.totalValue > 0 && (
+                              <div className="mt-3 pt-3 border-t border-white/5 space-y-1">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="text-stone-500">Valor Total:</span>
+                                  <span className="text-stone-200 font-bold">R$ {appointment.totalValue.toFixed(2)}</span>
+                                </div>
+                                {appointment.depositValue > 0 && (
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-green-500">✓ Entrada Paga:</span>
+                                    <span className="text-green-400 font-bold">R$ {appointment.depositValue.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {appointment.remainingValue > 0 && (
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="text-amber-500">Restante:</span>
+                                    <span className="text-amber-400 font-bold">R$ {appointment.remainingValue.toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="relative">
+                            <button 
+                              onClick={() => setActiveMenuId(activeMenuId === appointment.id ? null : appointment.id)}
+                              className="p-1 rounded hover:bg-white/10 text-stone-500 hover:text-white transition-all"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {activeMenuId === appointment.id && (
+                              <div ref={menuRef} className="absolute right-0 top-8 z-[100] w-56 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
+                                <div className="py-1">
+                                  <button 
+                                    onClick={() => handleEdit(appointment)}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
+                                  >
+                                    <Edit2 size={14} /> Editar
+                                  </button>
+                                  
+                                  {appointment.status !== 'confirmado' && (
+                                    <button 
+                                      onClick={() => updateStatus(appointment.id, 'confirmado')}
+                                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
+                                    >
+                                      <i className="fas fa-check-circle w-4"></i> Confirmar
+                                    </button>
+                                  )}
+                                  
+                                  {appointment.status !== 'concluido' && (
+                                    <button 
+                                      onClick={() => updateStatus(appointment.id, 'concluido')}
+                                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
+                                    >
+                                      <i className="fas fa-check-double w-4"></i> Marcar como Concluído
+                                    </button>
+                                  )}
+                                  
+                                  {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
+                                    <button
+                                      onClick={async () => {
+                                        setActiveMenuId(null);
+                                        if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
+                                          try {
+                                            await updateDoc(doc(db, 'appointments', appointment.id), {
+                                              status: 'pago',
+                                              paymentDate: new Date().toISOString()
+                                            });
+                                            await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue);
+                                            showMessage('✓ Pagamento registrado!');
+                                          } catch (error) {
+                                            console.error('Erro:', error);
+                                            showMessage('Erro ao registrar pagamento');
+                                          }
+                                        }
+                                      }}
+                                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-green-400 hover:bg-stone-700 transition-colors"
+                                    >
+                                      <i className="fas fa-dollar-sign w-4"></i>
+                                      <span>Marcar como Pago</span>
+                                    </button>
+                                  )}
+
+                                  <div className="h-px bg-white/10 my-1"></div>
+
+                                  <button 
+                                    onClick={() => handleDelete(appointment.id, appointment.client)}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                                  >
+                                    <Trash2 size={14} /> Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
