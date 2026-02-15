@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
-  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2
+  X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2,
+  Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type
 } from 'lucide-react';
-import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 const IMGBB_API_KEY = '9f8d8580331d26fcb2e3fae394e63b7f';
@@ -17,6 +18,17 @@ interface TeamMember {
   hasAccess: boolean;
 }
 
+interface SlideItem {
+  id: string;
+  type: 'image' | 'video' | 'text';
+  url?: string;
+  title?: string;
+  description?: string;
+  backgroundColor?: string;
+  textColor?: string;
+  order: number;
+}
+
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<any>({
     coverImage: '',
@@ -26,7 +38,8 @@ const SettingsPage: React.FC = () => {
     venueSubtitle: 'Eventos & Festas',
     address: '',
     whatsapp: '',
-    instagram: ''
+    instagram: '',
+    email: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -41,6 +54,21 @@ const SettingsPage: React.FC = () => {
   const [newMember, setNewMember] = useState<Partial<TeamMember>>({
     name: '', role: '', email: '', hasAccess: false, photoUrl: ''
   });
+  
+  const [slides, setSlides] = useState<SlideItem[]>([]);
+  const [showSlideModal, setShowSlideModal] = useState(false);
+  const [editingSlide, setEditingSlide] = useState<SlideItem | null>(null);
+  const [uploadingSlide, setUploadingSlide] = useState(false);
+  const [newSlide, setNewSlide] = useState<Partial<SlideItem>>({
+    type: 'image',
+    title: '',
+    description: '',
+    url: '',
+    backgroundColor: '#0c0a09',
+    textColor: '#e7e5e4',
+    order: 0
+  });
+  
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +90,15 @@ const SettingsPage: React.FC = () => {
     const unsub = onSnapshot(collection(db, 'team'), (snapshot) => {
       const members = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamMember));
       setTeamMembers(members);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'slides'), orderBy('order', 'asc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SlideItem));
+      setSlides(items);
     });
     return () => unsub();
   }, []);
@@ -184,6 +221,7 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  // TEAM MEMBERS
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) {
@@ -202,30 +240,27 @@ const SettingsPage: React.FC = () => {
         showMessage('✅ Membro atualizado!');
       } else {
         await addDoc(collection(db, 'team'), {
-          name: newMember.name,
-          role: newMember.role || '',
-          email: newMember.email,
-          photoUrl: newMember.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newMember.name)}`,
-          createdAt: new Date(),
+          ...newMember,
+          photoUrl: newMember.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(newMember.name!)}`,
           hasAccess: false
         });
         showMessage('✅ Membro adicionado!');
       }
       closeModal();
     } catch (error) {
-      console.error("Erro:", error);
-      showMessage('❌ Erro ao salvar.');
+      console.error('Erro:', error);
+      showMessage('❌ Erro ao salvar membro.');
     }
   };
 
   const handleDeleteMember = async (id: string) => {
-    if (window.confirm('Remover este membro?')) {
+    if (window.confirm('Excluir este membro?')) {
       try {
         await deleteDoc(doc(db, 'team', id));
-        setActiveMenuId(null);
         showMessage('✅ Membro removido!');
+        setActiveMenuId(null);
       } catch (error) {
-        console.error("Erro:", error);
+        console.error('Erro:', error);
         showMessage('❌ Erro ao remover.');
       }
     }
@@ -233,14 +268,12 @@ const SettingsPage: React.FC = () => {
 
   const toggleAccess = async (member: TeamMember) => {
     try {
-      await updateDoc(doc(db, 'team', member.id), {
-        hasAccess: !member.hasAccess
-      });
+      await updateDoc(doc(db, 'team', member.id), { hasAccess: !member.hasAccess });
+      showMessage(member.hasAccess ? '❌ Acesso revogado!' : '✅ Acesso liberado!');
       setActiveMenuId(null);
-      showMessage(member.hasAccess ? '✅ Acesso revogado!' : '✅ Acesso liberado!');
     } catch (error) {
-      console.error("Erro", error);
-      showMessage('❌ Erro ao alterar.');
+      console.error('Erro:', error);
+      showMessage('❌ Erro ao alterar acesso.');
     }
   };
 
@@ -263,230 +296,318 @@ const SettingsPage: React.FC = () => {
     setNewMember({ name: '', role: '', email: '', hasAccess: false, photoUrl: '' });
   };
 
-  return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 text-amber-600 mb-1">
-            <Sparkles size={16} />
-            <span className="text-xs font-bold uppercase tracking-widest">Branding & Visual</span>
-          </div>
-          <h2 className="font-serif text-4xl font-bold text-stone-100 tracking-tight">Personalização do Site</h2>
-        </div>
-      </div>
+  // SLIDES
+  const handleSlideFileUpload = async (file: File) => {
+    if (!file) return;
 
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      showMessage('❌ Selecione uma imagem ou vídeo.');
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      showMessage('❌ Arquivo muito grande. Máximo 50MB.');
+      return;
+    }
+
+    setUploadingSlide(true);
+
+    try {
+      if (isImage) {
+        const imageUrl = await uploadToImgBB(file);
+        setNewSlide({ ...newSlide, url: imageUrl, type: 'image' });
+        setUploadProgress('');
+        showMessage('✅ Imagem carregada!');
+      } else {
+        // Para vídeos, você precisará de outro serviço de upload
+        // Por enquanto, vamos permitir apenas URLs de vídeo
+        showMessage('⚠️ Para vídeos, insira a URL diretamente (YouTube, Vimeo, etc)');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      setUploadProgress('');
+      showMessage('❌ Erro ao fazer upload.');
+    } finally {
+      setUploadingSlide(false);
+    }
+  };
+
+  const handleSaveSlide = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newSlide.type !== 'text' && !newSlide.url) {
+      showMessage('❌ Adicione uma imagem/vídeo ou URL!');
+      return;
+    }
+
+    if (newSlide.type === 'text' && !newSlide.title && !newSlide.description) {
+      showMessage('❌ Adicione título ou descrição!');
+      return;
+    }
+
+    try {
+      const slideData = {
+        ...newSlide,
+        order: editingSlide ? editingSlide.order : slides.length
+      };
+
+      if (editingSlide) {
+        await updateDoc(doc(db, 'slides', editingSlide.id), slideData);
+        showMessage('✅ Slide atualizado!');
+      } else {
+        await addDoc(collection(db, 'slides'), slideData);
+        showMessage('✅ Slide adicionado!');
+      }
+      closeSlideModal();
+    } catch (error) {
+      console.error('Erro:', error);
+      showMessage('❌ Erro ao salvar slide.');
+    }
+  };
+
+  const handleDeleteSlide = async (id: string) => {
+    if (window.confirm('Excluir este slide?')) {
+      try {
+        await deleteDoc(doc(db, 'slides', id));
+        showMessage('✅ Slide removido!');
+        setActiveMenuId(null);
+      } catch (error) {
+        console.error('Erro:', error);
+        showMessage('❌ Erro ao remover.');
+      }
+    }
+  };
+
+  const moveSlide = async (id: string, direction: 'up' | 'down') => {
+    const currentIndex = slides.findIndex(s => s.id === id);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= slides.length) return;
+
+    try {
+      await updateDoc(doc(db, 'slides', slides[currentIndex].id), { order: newIndex });
+      await updateDoc(doc(db, 'slides', slides[newIndex].id), { order: currentIndex });
+      showMessage('✅ Ordem atualizada!');
+    } catch (error) {
+      console.error('Erro:', error);
+      showMessage('❌ Erro ao reordenar.');
+    }
+  };
+
+  const openEditSlideModal = (slide: SlideItem) => {
+    setEditingSlide(slide);
+    setNewSlide({
+      type: slide.type,
+      url: slide.url || '',
+      title: slide.title || '',
+      description: slide.description || '',
+      backgroundColor: slide.backgroundColor || '#0c0a09',
+      textColor: slide.textColor || '#e7e5e4',
+      order: slide.order
+    });
+    setShowSlideModal(true);
+    setActiveMenuId(null);
+  };
+
+  const closeSlideModal = () => {
+    setShowSlideModal(false);
+    setEditingSlide(null);
+    setNewSlide({
+      type: 'image',
+      title: '',
+      description: '',
+      url: '',
+      backgroundColor: '#0c0a09',
+      textColor: '#e7e5e4',
+      order: 0
+    });
+  };
+
+  return (
+    <div className="space-y-8">
       {message && (
-        <div className={`p-4 rounded-lg text-xs font-bold uppercase tracking-widest text-center ${message.includes('❌') ? 'bg-red-500/20 text-red-500 border border-red-500/20' : 'bg-green-500/20 text-green-500 border border-green-500/20'}`}>
+        <div className={`p-4 rounded-lg text-xs font-bold uppercase tracking-widest text-center ${
+          message.includes('❌') || message.includes('Erro') 
+            ? 'bg-red-500/20 text-red-500 border border-red-500/20' 
+            : 'bg-green-500/20 text-green-500 border border-green-500/20'
+        }`}>
           {message}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
-          {/* CAPA */}
+      <div>
+        <h2 className="font-serif text-4xl font-bold text-stone-100">Configurações do Site</h2>
+        <p className="text-stone-500 mt-2">Gerencie a aparência e conteúdo da página pública.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Imagens Principais */}
+        <div className="space-y-6">
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
-            <h3 className="mb-8 font-bold text-stone-100 flex items-center">
-              <Image size={18} className="mr-2 text-amber-500" />
-              Capa da Página Pública (Banner Principal)
+            <h3 className="font-bold text-stone-100 mb-6 flex items-center">
+              <Camera size={18} className="mr-2 text-amber-500" />
+              Imagens da Página
             </h3>
-            <div className="space-y-4">
-              <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">
-                Imagem de Capa (Recomendado: 1920x600px)
+
+            {/* Capa Hero */}
+            <div className="mb-6">
+              <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                Imagem de Capa (Hero)
               </label>
-              <div className="relative group aspect-[16/5] rounded-xl overflow-hidden bg-stone-950 border border-white/5">
-                <img 
-                  src={settings.coverImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100'} 
-                  className="h-full w-full object-cover opacity-60 group-hover:opacity-80 transition-all" 
-                  alt="Cover" 
-                />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
-                  <input
-                    type="url"
-                    value={settings.coverImage}
-                    onChange={e => setSettings({...settings, coverImage: e.target.value})}
-                    className="w-full max-w-xl rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                    placeholder="URL da capa..."
-                  />
-                  <div className="flex items-center gap-2 w-full max-w-xl">
-                    <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file, 'cover');
-                        }}
-                        disabled={uploadingCover}
-                      />
-                      <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
-                        {uploadingCover ? (
-                          <>
-                            <Loader2 className="animate-spin" size={14} />
-                            <span>{uploadProgress}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Upload size={14} />
-                            <span>Upload Capa</span>
-                          </>
-                        )}
-                      </div>
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
+                {settings.coverImage ? (
+                  <>
+                    <img src={settings.coverImage} alt="Capa" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => setSettings({ ...settings, coverImage: '' })}
+                      className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="coverUpload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'cover');
+                      }}
+                      disabled={uploadingCover}
+                    />
+                    <label
+                      htmlFor="coverUpload"
+                      className={`cursor-pointer flex flex-col items-center ${uploadingCover ? 'pointer-events-none' : ''}`}
+                    >
+                      {uploadingCover ? (
+                        <>
+                          <Loader2 className="animate-spin text-amber-500 mb-2" size={32} />
+                          <p className="text-stone-500 text-xs">{uploadProgress}</p>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={32} className="text-stone-600 mb-2" />
+                          <p className="text-stone-400 text-sm">Clique para enviar</p>
+                        </>
+                      )}
                     </label>
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
+
+            {/* Imagem About */}
+            <div className="mb-6">
+              <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                Imagem Sobre
+              </label>
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
+                {settings.aboutImage ? (
+                  <>
+                    <img src={settings.aboutImage} alt="Sobre" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => setSettings({ ...settings, aboutImage: '' })}
+                      className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      id="aboutUpload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'about');
+                      }}
+                      disabled={uploadingAbout}
+                    />
+                    <label
+                      htmlFor="aboutUpload"
+                      className={`cursor-pointer flex flex-col items-center ${uploadingAbout ? 'pointer-events-none' : ''}`}
+                    >
+                      {uploadingAbout ? (
+                        <>
+                          <Loader2 className="animate-spin text-amber-500 mb-2" size={32} />
+                          <p className="text-stone-500 text-xs">{uploadProgress}</p>
+                        </>
+                      ) : (
+                        <>
+                          <Upload size={32} className="text-stone-600 mb-2" />
+                          <p className="text-stone-400 text-sm">Clique para enviar</p>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Hero e About */}
+          {/* Informações do Site */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
-            <h3 className="mb-8 font-bold text-stone-100 flex items-center">
-              <Camera size={18} className="mr-2 text-amber-500" />
-              Imagens de Impacto Visual
+            <h3 className="font-bold text-stone-100 mb-6 flex items-center">
+              <Sparkles size={18} className="mr-2 text-amber-500" />
+              Informações do Site
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Hero */}
-              <div className="space-y-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">Seção Hero</label>
-                <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
-                  <img 
-                    src={settings.heroImage || 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3'} 
-                    className="h-full w-full object-cover opacity-40 group-hover:opacity-60 transition-all" 
-                    alt="Hero" 
-                  />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
-                    <input
-                      type="url"
-                      value={settings.heroImage}
-                      onChange={e => setSettings({...settings, heroImage: e.target.value})}
-                      className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="URL..."
-                    />
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
-                      <label className="flex-1 cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(file, 'hero');
-                          }}
-                          disabled={uploadingHero}
-                        />
-                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
-                          {uploadingHero ? (
-                            <>
-                              <Loader2 className="animate-spin" size={14} />
-                              <span>{uploadProgress}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={14} />
-                              <span>Upload</span>
-                            </>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* About */}
-              <div className="space-y-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 block">Seção Sobre</label>
-                <div className="relative group aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5">
-                  <img 
-                    src={settings.aboutImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622'} 
-                    className="h-full w-full object-cover opacity-40 group-hover:opacity-60 transition-all" 
-                    alt="About" 
-                  />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
-                    <input
-                      type="url"
-                      value={settings.aboutImage}
-                      onChange={e => setSettings({...settings, aboutImage: e.target.value})}
-                      className="w-full rounded-lg border border-white/10 bg-stone-900/80 backdrop-blur-md py-3 px-4 text-xs text-stone-200 placeholder:text-stone-600 focus:ring-1 focus:ring-amber-500 outline-none"
-                      placeholder="URL..."
-                    />
-                    <div className="flex items-center gap-2 w-full">
-                      <span className="text-xs font-bold uppercase tracking-widest text-stone-500">ou</span>
-                      <label className="flex-1 cursor-pointer">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageUpload(file, 'about');
-                          }}
-                          disabled={uploadingAbout}
-                        />
-                        <div className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-amber-600/90 backdrop-blur-md py-2 px-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
-                          {uploadingAbout ? (
-                            <>
-                              <Loader2 className="animate-spin" size={14} />
-                              <span>{uploadProgress}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Upload size={14} />
-                              <span>Upload</span>
-                            </>
-                          )}
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Identidade */}
-          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
-            <h3 className="mb-6 font-bold text-stone-100">Identidade & Contatos</h3>
-            
-            <div className="space-y-6">
+            <div className="space-y-5">
               <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-stone-500 w-32">Nome do Venue</span>
+                <Sparkles size={16} className="text-stone-400 w-32" />
                 <input
                   type="text"
                   value={settings.venueTitle}
                   onChange={e => setSettings({...settings, venueTitle: e.target.value})}
                   className="flex-1 bg-transparent border-b border-white/10 py-2 text-sm text-stone-300 focus:border-amber-500 outline-none"
-                  placeholder="LATITUDE22"
+                  placeholder="Nome do Local"
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-stone-500 w-32">Segmento</span>
+                <Type size={16} className="text-stone-400 w-32" />
                 <input
                   type="text"
                   value={settings.venueSubtitle}
                   onChange={e => setSettings({...settings, venueSubtitle: e.target.value})}
                   className="flex-1 bg-transparent border-b border-white/10 py-2 text-sm text-stone-300 focus:border-amber-500 outline-none"
-                  placeholder="Eventos & Festas"
+                  placeholder="Subtítulo"
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <Instagram size={16} className="text-amber-500 w-32" />
+                <Mail size={16} className="text-stone-400 w-32" />
+                <input
+                  type="email"
+                  value={settings.email}
+                  onChange={e => setSettings({...settings, email: e.target.value})}
+                  className="flex-1 bg-transparent border-b border-white/10 py-2 text-sm text-stone-300 focus:border-amber-500 outline-none"
+                  placeholder="contato@email.com"
+                />
+              </div>
+
+              <div className="flex items-center gap-4">
+                <Instagram size={16} className="text-stone-400 w-32" />
                 <input
                   type="text"
                   value={settings.instagram}
                   onChange={e => setSettings({...settings, instagram: e.target.value})}
                   className="flex-1 bg-transparent border-b border-white/10 py-2 text-sm text-stone-300 focus:border-amber-500 outline-none"
-                  placeholder="@latitude22_"
+                  placeholder="@seuinstagram"
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <MessageCircle size={16} className="text-green-500 w-32" />
+                <MessageCircle size={16} className="text-stone-400 w-32" />
                 <input
                   type="text"
                   value={settings.whatsapp}
@@ -521,8 +642,111 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Equipe */}
+        {/* Slider/Carrossel */}
         <div className="space-y-6">
+          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-bold text-stone-100 flex items-center">
+                <ImageIcon size={18} className="mr-2 text-amber-500" />
+                Slider da Página Inicial
+              </h3>
+              <button 
+                onClick={() => setShowSlideModal(true)}
+                className="p-2 rounded-full bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white transition-all"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {slides.length === 0 && (
+                <p className="text-xs text-stone-500 text-center py-8">
+                  Nenhum slide cadastrado. Clique em + para adicionar.
+                </p>
+              )}
+              
+              {slides.map((slide, index) => (
+                <div key={slide.id} className="relative group flex items-center gap-4 p-4 rounded-xl bg-stone-950 border border-white/5 hover:border-amber-500/30 transition-all">
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => moveSlide(slide.id, 'up')}
+                      disabled={index === 0}
+                      className="p-1 rounded bg-stone-800 text-stone-500 hover:text-amber-500 disabled:opacity-30 transition-all"
+                    >
+                      <ArrowUp size={14} />
+                    </button>
+                    <button
+                      onClick={() => moveSlide(slide.id, 'down')}
+                      disabled={index === slides.length - 1}
+                      className="p-1 rounded bg-stone-800 text-stone-500 hover:text-amber-500 disabled:opacity-30 transition-all"
+                    >
+                      <ArrowDown size={14} />
+                    </button>
+                  </div>
+
+                  <div className="flex-shrink-0">
+                    {slide.type === 'image' && slide.url && (
+                      <img src={slide.url} alt={slide.title} className="w-20 h-20 object-cover rounded-lg" />
+                    )}
+                    {slide.type === 'video' && (
+                      <div className="w-20 h-20 bg-stone-800 rounded-lg flex items-center justify-center">
+                        <Video size={24} className="text-stone-600" />
+                      </div>
+                    )}
+                    {slide.type === 'text' && (
+                      <div className="w-20 h-20 bg-stone-800 rounded-lg flex items-center justify-center">
+                        <Type size={24} className="text-stone-600" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold uppercase tracking-widest text-stone-500">
+                        {slide.type === 'image' ? 'Imagem' : slide.type === 'video' ? 'Vídeo' : 'Texto'}
+                      </span>
+                      <span className="text-xs text-stone-600">#{index + 1}</span>
+                    </div>
+                    <p className="text-sm font-bold text-stone-200 truncate">{slide.title || 'Sem título'}</p>
+                    {slide.description && (
+                      <p className="text-xs text-stone-500 truncate mt-1">{slide.description}</p>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <button 
+                      onClick={() => setActiveMenuId(activeMenuId === slide.id ? null : slide.id)}
+                      className="p-2 text-stone-500 hover:text-white transition-colors"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+
+                    {activeMenuId === slide.id && (
+                      <div ref={menuRef} className="absolute right-0 top-8 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
+                        <button 
+                          onClick={() => openEditSlideModal(slide)}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                        >
+                          <Edit2 size={12} /> Editar
+                        </button>
+
+                        <div className="h-px bg-white/10"></div>
+
+                        <button 
+                          onClick={() => handleDeleteSlide(slide.id)}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10"
+                        >
+                          <Trash2 size={12} /> Excluir
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Equipe */}
           <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-stone-100 flex items-center">
@@ -681,6 +905,197 @@ const SettingsPage: React.FC = () => {
                   className="w-full rounded-lg bg-amber-600 py-3 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all"
                 >
                   {editingMember ? 'Salvar' : 'Adicionar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Slide */}
+      {showSlideModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-950/90 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-serif text-xl font-bold text-stone-100">
+                {editingSlide ? 'Editar Slide' : 'Novo Slide'}
+              </h3>
+              <button onClick={closeSlideModal} className="text-stone-500 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveSlide} className="space-y-6">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Tipo de Slide *</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setNewSlide({...newSlide, type: 'image'})}
+                    className={`p-4 rounded-lg border transition-all ${
+                      newSlide.type === 'image' 
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-500' 
+                        : 'border-white/10 text-stone-500 hover:border-amber-500/30'
+                    }`}
+                  >
+                    <ImageIcon size={24} className="mx-auto mb-2" />
+                    <p className="text-xs font-bold uppercase">Imagem</p>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setNewSlide({...newSlide, type: 'video'})}
+                    className={`p-4 rounded-lg border transition-all ${
+                      newSlide.type === 'video' 
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-500' 
+                        : 'border-white/10 text-stone-500 hover:border-amber-500/30'
+                    }`}
+                  >
+                    <Video size={24} className="mx-auto mb-2" />
+                    <p className="text-xs font-bold uppercase">Vídeo</p>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setNewSlide({...newSlide, type: 'text'})}
+                    className={`p-4 rounded-lg border transition-all ${
+                      newSlide.type === 'text' 
+                        ? 'border-amber-500 bg-amber-500/10 text-amber-500' 
+                        : 'border-white/10 text-stone-500 hover:border-amber-500/30'
+                    }`}
+                  >
+                    <Type size={24} className="mx-auto mb-2" />
+                    <p className="text-xs font-bold uppercase">Texto</p>
+                  </button>
+                </div>
+              </div>
+
+              {(newSlide.type === 'image' || newSlide.type === 'video') && (
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-3 block">
+                    {newSlide.type === 'image' ? 'Imagem' : 'URL do Vídeo'} *
+                  </label>
+                  
+                  {newSlide.type === 'image' && !newSlide.url && (
+                    <div className="border-2 border-dashed border-white/10 rounded-xl p-12 text-center hover:border-amber-500/50 transition-all">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        id="slideImageUpload" 
+                        onChange={(e) => { 
+                          const file = e.target.files?.[0]; 
+                          if (file) handleSlideFileUpload(file); 
+                        }} 
+                        disabled={uploadingSlide} 
+                      />
+                      <label htmlFor="slideImageUpload" className={`cursor-pointer flex flex-col items-center ${uploadingSlide ? 'pointer-events-none opacity-50' : ''}`}>
+                        {uploadingSlide ? (
+                          <>
+                            <Loader2 className="animate-spin text-amber-500 mb-4" size={48} />
+                            <p className="text-stone-400 font-semibold">{uploadProgress}</p>
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={48} className="text-stone-600 mb-4" />
+                            <p className="text-stone-300 font-semibold mb-2">📸 Selecionar Imagem</p>
+                            <p className="text-stone-600 text-sm">JPG, PNG (máx 10MB)</p>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  )}
+
+                  {(newSlide.type === 'video' || newSlide.url) && (
+                    <div>
+                      {newSlide.url && newSlide.type === 'image' && (
+                        <div className="relative aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5 mb-3">
+                          <img src={newSlide.url} alt="Preview" className="h-full w-full object-cover" />
+                          <button 
+                            type="button" 
+                            onClick={() => setNewSlide({...newSlide, url: ''})} 
+                            className="absolute top-3 right-3 p-2 rounded-full bg-red-600 text-white hover:bg-red-700 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                      
+                      {newSlide.type === 'video' && (
+                        <input 
+                          type="url" 
+                          required={newSlide.type === 'video'}
+                          value={newSlide.url}
+                          onChange={e => setNewSlide({...newSlide, url: e.target.value})}
+                          className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
+                          placeholder="https://..."
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Título</label>
+                <input 
+                  type="text" 
+                  value={newSlide.title}
+                  onChange={e => setNewSlide({...newSlide, title: e.target.value})}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
+                  placeholder="Ex: Bem-vindo ao Latitude22"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Descrição</label>
+                <textarea 
+                  value={newSlide.description}
+                  onChange={e => setNewSlide({...newSlide, description: e.target.value})}
+                  rows={3}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none resize-none"
+                  placeholder="Descrição do slide"
+                />
+              </div>
+
+              {newSlide.type === 'text' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Cor de Fundo</label>
+                    <input 
+                      type="color" 
+                      value={newSlide.backgroundColor}
+                      onChange={e => setNewSlide({...newSlide, backgroundColor: e.target.value})}
+                      className="w-full h-12 rounded-lg bg-stone-950 border border-white/10 cursor-pointer"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Cor do Texto</label>
+                    <input 
+                      type="color" 
+                      value={newSlide.textColor}
+                      onChange={e => setNewSlide({...newSlide, textColor: e.target.value})}
+                      className="w-full h-12 rounded-lg bg-stone-950 border border-white/10 cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4 pt-4">
+                <button 
+                  type="button"
+                  onClick={closeSlideModal}
+                  className="flex-1 rounded-lg border border-white/10 bg-stone-950 px-6 py-3 text-xs font-bold uppercase tracking-widest text-stone-400 hover:bg-stone-800 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={uploadingSlide}
+                  className="flex-1 rounded-lg bg-amber-600 px-6 py-3 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all disabled:opacity-50"
+                >
+                  {editingSlide ? 'Salvar' : 'Adicionar'}
                 </button>
               </div>
             </form>
