@@ -206,7 +206,7 @@ const PublicPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <img 
             src={settings.coverImage || settings.heroImage} 
-            className="h-full w-full object-cover opacity-20 scale-50" 
+            className="h-full w-full object-cover opacity-90 scale-100" 
             alt="Hero" 
           />
           <div className="absolute inset-0 bg-gradient-to-b from-stone-950/40 via-stone-950/60 to-stone-950"></div>
@@ -224,13 +224,13 @@ const PublicPage: React.FC = () => {
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
             <button 
               onClick={() => scrollToSection('galeria')}
-              className="w-full sm:w-auto px-12 py-5 bg-white text-stone-950 text-[10px] font-bold uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all"
+              className="w-full sm:w-auto px-10 py-4 bg-white text-stone-750 text-[8px] font-bold uppercase tracking-widest hover:bg-amber-400 hover:text-white transition-all"
             >
               Ver Portfólio
             </button>
             <button 
               onClick={() => setShowBudgetModal(true)}
-              className="w-full sm:w-auto px-12 py-5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
+              className="w-full sm:w-auto px-10 py-4 border border-white/20 text-white text-[8px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
             >
               Solicitar Orçamento
             </button>
