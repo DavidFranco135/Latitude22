@@ -25,8 +25,9 @@ const PublicPage: React.FC = () => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [settings, setSettings] = useState<any>({
     coverImage: '',
-    heroImage: 'https://images.unsplash.com/photo-1519167758481-83f550bb49b3?auto=format&fit=crop&q=100',
-    aboutImage: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80',
+    heroImage: '',
+    aboutImage: '',
+    venuetitle: '',
     venueSubtitle: 'Eventos & Festas',
     whatsapp: '',
     instagram: '',
@@ -224,7 +225,7 @@ const PublicPage: React.FC = () => {
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
             <button 
               onClick={() => scrollToSection('galeria')}
-              className="w-full sm:w-auto px-10 py-5 bg-white text-stone-950 text-[9px] font-bold uppercase tracking-widest hover:bg-amber-400 hover:text-white transition-all"
+              className="w-full sm:w-auto px-10 py-4 bg-white text-stone-950 text-[9px] font-bold uppercase tracking-widest hover:bg-amber-400 hover:text-white transition-all"
             >
               Ver Portfólio
             </button>
