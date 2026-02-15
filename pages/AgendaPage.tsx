@@ -469,7 +469,7 @@ const lancarNoFinanceiro = async (
                       <span className="text-xs font-bold text-stone-600 uppercase tracking-widest">{hour}</span>
                     </div>
                     {appointment ? (
-                      <div className={`flex-1 rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative overflow-hidden group hover:shadow-lg transition-all`}>
+                      <div className={`flex-1 rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative group hover:shadow-lg transition-all`}>
                         <div className="relative z-10">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -489,30 +489,30 @@ const lancarNoFinanceiro = async (
                               </button>
 
                               {activeMenuId === appointment.id && (
-                                <div ref={menuRef} className="absolute right-0 top-8 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
+                                <div ref={menuRef} className="absolute right-0 top-8 z-[100] w-56 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
                                   <div className="py-1">
                                     <button 
                                       onClick={() => handleEdit(appointment)}
-                                      className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                     >
-                                      <Edit2 size={12} /> Editar
+                                      <Edit2 size={14} /> Editar
                                     </button>
                                     
                                     {appointment.status !== 'confirmado' && (
                                       <button 
                                         onClick={() => updateStatus(appointment.id, 'confirmado')}
-                                        className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                                        className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                       >
-                                        Confirmar
+                                        <i className="fas fa-check-circle w-4"></i> Confirmar
                                       </button>
                                     )}
                                     
                                     {appointment.status !== 'concluido' && (
                                       <button 
                                         onClick={() => updateStatus(appointment.id, 'concluido')}
-                                        className="flex w-full items-center gap-2 px-4 py-2 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                                        className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                       >
-                                        Marcar como Concluído
+                                        <i className="fas fa-check-double w-4"></i> Marcar como Concluído
                                       </button>
                                     )}
                                     
@@ -539,7 +539,7 @@ const lancarNoFinanceiro = async (
                                             }
                                           }
                                         }}
-                                        className="flex w-full items-center gap-2 px-4 py-2 text-xs text-green-400 hover:bg-green-500/10"
+                                        className="flex w-full items-center gap-3 px-4 py-3 text-sm text-green-400 hover:bg-stone-700 transition-colors"
                                       >
                                         <i className="fas fa-dollar-sign w-4"></i>
                                         <span>Marcar como Pago</span>
@@ -550,9 +550,9 @@ const lancarNoFinanceiro = async (
 
                                     <button 
                                       onClick={() => handleDelete(appointment.id, appointment.client)}
-                                      className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-400 hover:bg-red-500/10"
+                                      className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                                     >
-                                      <Trash2 size={12} /> Cancelar
+                                      <Trash2 size={14} /> Cancelar
                                     </button>
                                   </div>
                                 </div>
