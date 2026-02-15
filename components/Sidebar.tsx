@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { UserRole } from '../types';
 import { 
@@ -30,6 +30,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
   const isAdmin = role === UserRole.ADMIN;
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Prevenir scroll quando menu estiver aberto
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileOpen]);
+
   const menuItems = [
     { label: 'Visão Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
     { label: 'Calendário de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
@@ -44,11 +56,20 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
 
   return (
     <>
-      {/* Overlay Mobile - Z-INDEX ALTO */}
+      {/* Overlay Mobile - FUNCIONA EM QUALQUER ORIENTAÇÃO */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-[998] md:hidden"
           onClick={onMobileClose}
+          style={{ 
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh'
+          }}
         />
       )}
 
@@ -116,29 +137,37 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         </div>
       </div>
 
-      {/* Sidebar Mobile - Z-INDEX ALTO */}
+      {/* Sidebar Mobile - PORTRAIT E LANDSCAPE */}
       <div 
-        className={`fixed top-0 left-0 h-screen w-72 flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-[999] md:hidden transition-transform duration-300 ${
+        className={`fixed top-0 left-0 h-full w-72 flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-[999] md:hidden transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '100vh',
+          maxHeight: '100vh',
+          overflowY: 'auto'
+        }}
       >
         {/* Header */}
-        <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative">
-          <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-          <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
+        <div className="flex h-20 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative flex-shrink-0">
+          <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
+          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
           
           {/* Botão Fechar Mobile */}
           <button
             onClick={onMobileClose}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-stone-500 hover:text-white transition-colors active:scale-95"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full text-stone-500 hover:text-white transition-colors active:scale-95"
             aria-label="Fechar menu"
           >
-            <X size={24} />
+            <X size={22} />
           </button>
         </div>
         
         {/* Menu Items */}
-        <nav className="flex-1 space-y-1 p-6 overflow-y-auto">
+        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
           {menuItems.filter(item => item.show).map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -146,29 +175,29 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
                 key={item.path}
                 to={item.path}
                 onClick={onMobileClose}
-                className={`flex items-center space-x-3 rounded-lg px-4 py-3.5 transition-all duration-200 group ${
+                className={`flex items-center space-x-3 rounded-lg px-3 py-3 transition-all duration-200 group ${
                   isActive 
                     ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
                     : 'hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <span className={`${isActive ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-500'} transition-colors`}>
+                <span className={`flex-shrink-0 ${isActive ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-500'} transition-colors`}>
                   {item.icon}
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-widest">{item.label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest">{item.label}</span>
               </Link>
             );
           })}
         </nav>
         
         {/* Logout */}
-        <div className="p-6 border-t border-white/5">
+        <div className="p-4 border-t border-white/5 flex-shrink-0">
           <button 
             onClick={() => signOut(auth)}
-            className="flex w-full items-center space-x-3 rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group"
+            className="flex w-full items-center space-x-3 rounded-lg px-3 py-3 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group"
           >
-            <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
+            <LogOut size={18} className="flex-shrink-0 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
           </button>
         </div>
       </div>
