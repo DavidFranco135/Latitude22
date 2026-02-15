@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, ChevronLeft, ChevronRight, Filter, Edit2, Trash2, MoreVertical, X, UserPlus, Search } from 'lucide-react';
-import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 interface Appointment {
@@ -267,7 +267,20 @@ const lancarNoFinanceiro = async (
     
     if (window.confirm(confirmMessage)) {
       try {
-        // Se houve pagamento, registrar estorno no financeiro
+        // 1. PRIMEIRO: Buscar e deletar todos os lançamentos financeiros deste agendamento
+        const financialSnapshot = await getDocs(
+          query(collection(db, 'financial'), where('appointmentId', '==', id))
+        );
+        
+        // Deletar cada lançamento financeiro relacionado
+        const deletePromises = financialSnapshot.docs.map(docSnapshot => 
+          deleteDoc(doc(db, 'financial', docSnapshot.id))
+        );
+        await Promise.all(deletePromises);
+        
+        console.log(`🗑️ ${financialSnapshot.size} lançamento(s) financeiro(s) deletado(s)`);
+        
+        // 2. SEGUNDO: Se houve pagamento, registrar estorno
         if (valorPago > 0) {
           await addDoc(collection(db, 'financial'), {
             description: `ESTORNO - ${appointment.service} (${client})`,
@@ -283,7 +296,7 @@ const lancarNoFinanceiro = async (
           console.log(`💸 Estorno de R$ ${valorPago.toFixed(2)} registrado no financeiro`);
         }
         
-        // Deletar o agendamento
+        // 3. POR ÚLTIMO: Deletar o agendamento
         await deleteDoc(doc(db, 'appointments', id));
         showMessage(valorPago > 0 ? `Agendamento cancelado e R$ ${valorPago.toFixed(2)} estornado!` : 'Agendamento removido com sucesso!');
         setActiveMenuId(null);
@@ -525,7 +538,10 @@ const lancarNoFinanceiro = async (
                             </div>
                             <div className="relative">
                               <button 
-                                onClick={() => setActiveMenuId(activeMenuId === appointment.id ? null : appointment.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuId(activeMenuId === appointment.id ? null : appointment.id);
+                                }}
                                 className="p-1 rounded hover:bg-white/10 text-stone-500 hover:text-white transition-all"
                               >
                                 <MoreVertical size={16} />
@@ -535,7 +551,10 @@ const lancarNoFinanceiro = async (
                                 <div ref={menuRef} className="absolute right-0 top-8 z-[100] w-56 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
                                   <div className="py-1">
                                     <button 
-                                      onClick={() => handleEdit(appointment)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEdit(appointment);
+                                      }}
                                       className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                     >
                                       <Edit2 size={14} /> Editar
@@ -543,7 +562,10 @@ const lancarNoFinanceiro = async (
                                     
                                     {appointment.status !== 'confirmado' && (
                                       <button 
-                                        onClick={() => updateStatus(appointment.id, 'confirmado')}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          updateStatus(appointment.id, 'confirmado');
+                                        }}
                                         className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                       >
                                         <i className="fas fa-check-circle w-4"></i> Confirmar
@@ -552,7 +574,10 @@ const lancarNoFinanceiro = async (
                                     
                                     {appointment.status !== 'concluido' && (
                                       <button 
-                                        onClick={() => updateStatus(appointment.id, 'concluido')}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          updateStatus(appointment.id, 'concluido');
+                                        }}
                                         className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                       >
                                         <i className="fas fa-check-double w-4"></i> Marcar como Concluído
@@ -562,7 +587,8 @@ const lancarNoFinanceiro = async (
                                     {/* Botão Marcar como Pago */}
                                     {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
                                       <button
-                                        onClick={async () => {
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
                                           setActiveMenuId(null);
                                           if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
                                             try {
@@ -592,7 +618,10 @@ const lancarNoFinanceiro = async (
                                     <div className="h-px bg-white/10 my-1"></div>
 
                                     <button 
-                                      onClick={() => handleDelete(appointment.id, appointment.client)}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(appointment.id, appointment.client);
+                                      }}
                                       className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                                     >
                                       <Trash2 size={14} /> Cancelar
@@ -705,7 +734,10 @@ const lancarNoFinanceiro = async (
                           
                           <div className="relative">
                             <button 
-                              onClick={() => setActiveMenuId(activeMenuId === appointment.id ? null : appointment.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === appointment.id ? null : appointment.id);
+                              }}
                               className="p-1 rounded hover:bg-white/10 text-stone-500 hover:text-white transition-all"
                             >
                               <MoreVertical size={16} />
@@ -715,7 +747,10 @@ const lancarNoFinanceiro = async (
                               <div ref={menuRef} className="absolute right-0 top-8 z-[100] w-56 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
                                 <div className="py-1">
                                   <button 
-                                    onClick={() => handleEdit(appointment)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEdit(appointment);
+                                    }}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                   >
                                     <Edit2 size={14} /> Editar
@@ -723,7 +758,10 @@ const lancarNoFinanceiro = async (
                                   
                                   {appointment.status !== 'confirmado' && (
                                     <button 
-                                      onClick={() => updateStatus(appointment.id, 'confirmado')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateStatus(appointment.id, 'confirmado');
+                                      }}
                                       className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                     >
                                       <i className="fas fa-check-circle w-4"></i> Confirmar
@@ -732,7 +770,10 @@ const lancarNoFinanceiro = async (
                                   
                                   {appointment.status !== 'concluido' && (
                                     <button 
-                                      onClick={() => updateStatus(appointment.id, 'concluido')}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateStatus(appointment.id, 'concluido');
+                                      }}
                                       className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white transition-colors"
                                     >
                                       <i className="fas fa-check-double w-4"></i> Marcar como Concluído
@@ -741,7 +782,8 @@ const lancarNoFinanceiro = async (
                                   
                                   {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
                                     <button
-                                      onClick={async () => {
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
                                         setActiveMenuId(null);
                                         if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
                                           try {
@@ -767,7 +809,10 @@ const lancarNoFinanceiro = async (
                                   <div className="h-px bg-white/10 my-1"></div>
 
                                   <button 
-                                    onClick={() => handleDelete(appointment.id, appointment.client)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(appointment.id, appointment.client);
+                                    }}
                                     className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                                   >
                                     <Trash2 size={14} /> Cancelar
