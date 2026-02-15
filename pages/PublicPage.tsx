@@ -494,7 +494,7 @@ const PublicPage: React.FC = () => {
           
           <div className="mt-16 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-[9px] font-bold uppercase tracking-[0.4em] text-stone-600">
-              &copy; {new Date().getFullYear()} Salão {settings.venueTitle} | Crafted for Excellence
+              &copy; {new Date().getFullYear()} Salão {settings.venueTitle} | Produzido por NIKLAUS
             </div>
             <Link 
               to="/login" 
