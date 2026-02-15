@@ -8,6 +8,11 @@ interface Client {
   name: string;
   email: string;
   phone: string;
+  cpf_cnpj?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipcode?: string;
   lastEvent?: string;
   totalRevenue?: number;
   since?: string;
@@ -28,6 +33,11 @@ const ClientsPage: React.FC = () => {
     name: '',
     email: '',
     phone: '',
+    cpf_cnpj: '',
+    address: '',
+    city: '',
+    state: '',
+    zipcode: '',
     lastEvent: '',
     totalRevenue: 0,
     since: new Date().getFullYear().toString()
@@ -105,6 +115,11 @@ const ClientsPage: React.FC = () => {
       name: client.name,
       email: client.email,
       phone: client.phone,
+      cpf_cnpj: client.cpf_cnpj || '',
+      address: client.address || '',
+      city: client.city || '',
+      state: client.state || '',
+      zipcode: client.zipcode || '',
       lastEvent: client.lastEvent || '',
       totalRevenue: client.totalRevenue || 0,
       since: client.since || new Date().getFullYear().toString()
@@ -133,6 +148,11 @@ const ClientsPage: React.FC = () => {
       name: '',
       email: '',
       phone: '',
+      cpf_cnpj: '',
+      address: '',
+      city: '',
+      state: '',
+      zipcode: '',
       lastEvent: '',
       totalRevenue: 0,
       since: new Date().getFullYear().toString()
@@ -192,39 +212,47 @@ const ClientsPage: React.FC = () => {
         
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-stone-950 text-[10px] font-bold uppercase tracking-[0.2em] text-stone-500">
+            <thead className="border-b border-white/5 bg-stone-950/50">
               <tr>
-                <th className="px-6 py-5">Cliente</th>
-                <th className="px-6 py-5">Contato</th>
-                <th className="px-6 py-5">Último Evento</th>
-                <th className="px-6 py-5">Faturamento Acumulado</th>
-                <th className="px-6 py-5 text-right">Ações</th>
+                <th className="px-6 py-4">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Nome</span>
+                </th>
+                <th className="px-6 py-4">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Contato</span>
+                </th>
+                <th className="px-6 py-4">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Último Evento</span>
+                </th>
+                <th className="px-6 py-4">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Faturamento</span>
+                </th>
+                <th className="px-6 py-4 text-right">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Ações</span>
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-sm">
+            <tbody>
               {filteredClients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-stone-500">
-                    {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado ainda'}
+                  <td colSpan={5} className="px-6 py-8 text-center text-stone-600">
+                    <p className="text-sm font-medium">Nenhum cliente encontrado</p>
                   </td>
                 </tr>
               ) : (
                 filteredClients.map((client) => (
-                  <tr key={client.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={client.id} className="border-b border-white/5 hover:bg-white/2.5 transition-colors">
                     <td className="px-6 py-5">
                       <div className="flex items-center space-x-3">
-                        <div className="h-10 w-10 rounded-full bg-stone-800 flex items-center justify-center font-bold text-amber-500 border border-amber-500/20">
+                        <div className="h-10 w-10 rounded-lg bg-amber-600/20 flex items-center justify-center border border-amber-600/30 text-amber-500 font-bold text-xs">
                           {getInitials(client.name)}
                         </div>
                         <div>
-                          <p className="font-bold text-stone-100">{client.name}</p>
-                          <p className="text-[10px] text-stone-500 uppercase font-bold tracking-widest">
-                            Desde {client.since || '2024'}
-                          </p>
+                          <p className="font-semibold text-stone-100">{client.name}</p>
+                          {client.cpf_cnpj && <p className="text-[10px] text-stone-600">{client.cpf_cnpj}</p>}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-5 space-y-1">
+                    <td className="px-6 py-5">
                       <div className="flex items-center text-stone-400 space-x-2">
                         <Phone size={14} className="text-amber-600" />
                         <span>{client.phone}</span>
@@ -300,7 +328,7 @@ const ClientsPage: React.FC = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/90 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-6">
+          <div className="w-full max-w-2xl rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-serif text-xl font-bold text-stone-100">
                 {editingClient ? 'Editar Cliente' : 'Novo Cliente'}
@@ -311,6 +339,7 @@ const ClientsPage: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Dados Pessoais */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
@@ -356,6 +385,77 @@ const ClientsPage: React.FC = () => {
 
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                    CPF ou CNPJ
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.cpf_cnpj}
+                    onChange={(e) => setFormData({...formData, cpf_cnpj: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-3 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  />
+                </div>
+              </div>
+
+              {/* Endereço */}
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                  Endereço Completo
+                </label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-3 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="Rua, número, complemento"
+                />
+              </div>
+
+              {/* Cidade, Estado e CEP */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                    Cidade
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.city}
+                    onChange={(e) => setFormData({...formData, city: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-3 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="Rio de Janeiro"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                    UF
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.state}
+                    onChange={(e) => setFormData({...formData, state: e.target.value.toUpperCase()})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-3 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="RJ"
+                    maxLength={2}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                    CEP
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.zipcode}
+                    onChange={(e) => setFormData({...formData, zipcode: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-3 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="00000-000"
+                  />
+                </div>
+              </div>
+
+              {/* Informações Adicionais */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
                     Cliente Desde
                   </label>
                   <input 
@@ -379,20 +479,20 @@ const ClientsPage: React.FC = () => {
                     placeholder="12 Out 2024"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                    Faturamento Total (R$)
-                  </label>
-                  <input 
-                    type="number" 
-                    value={formData.totalRevenue}
-                    onChange={e => setFormData({...formData, totalRevenue: parseFloat(e.target.value) || 0})}
-                    className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
-                    placeholder="15250.00"
-                    step="0.01"
-                  />
-                </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                  Faturamento Total (R$)
+                </label>
+                <input 
+                  type="number" 
+                  value={formData.totalRevenue}
+                  onChange={e => setFormData({...formData, totalRevenue: parseFloat(e.target.value) || 0})}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
+                  placeholder="15250.00"
+                  step="0.01"
+                />
               </div>
 
               <div className="flex gap-4 pt-4">
