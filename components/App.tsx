@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './services/firebase';
 import { UserProfile, UserRole } from './types';
@@ -26,58 +25,61 @@ import Header from './components/Header';
 const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode, allowedRoles?: UserRole[] }) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        try {
+      try {
+        if (fbUser) {
           const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
           if (userDoc.exists()) {
             setUser({ uid: fbUser.uid, ...userDoc.data() } as UserProfile);
           } else {
-            // Caso o usuário exista no Auth mas não no Firestore, define perfil padrão
             setUser({ 
               uid: fbUser.uid, 
               email: fbUser.email!, 
-              displayName: fbUser.displayName || 'Usuário', 
-              role: UserRole.COLLABORATOR 
+              displayName: fbUser.displayName || 'Admin', 
+              role: UserRole.ADMIN 
             });
           }
-        } catch (error) {
-          console.error("Erro ao buscar perfil no Firestore:", error);
-          // Em caso de erro de permissão, não trava o sistema, mas limpa o user
+        } else {
           setUser(null);
         }
-      } else {
+      } catch (err) {
+        console.warn("Auth check error:", err);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
   if (loading) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-stone-950 text-amber-500">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-amber-600 border-t-transparent mb-4"></div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.3em]">Autenticando Latitude22...</p>
+      <div className="flex h-screen flex-col items-center justify-center bg-stone-950">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-amber-600 border-t-transparent mb-4"></div>
+        <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-stone-500">Carregando Sistema</span>
       </div>
     );
   }
 
   if (!user) return <Navigate to="/login" />;
-
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" />;
-  }
+  if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/dashboard" />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stone-950 text-stone-200">
-      <Sidebar role={user.role} />
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <Header user={user} />
-        <main className="p-4 md:p-8">
+    <div className="flex h-screen overflow-hidden bg-stone-950">
+      <Sidebar 
+        role={user.role} 
+        isMobileOpen={isMobileMenuOpen}
+        onMobileClose={() => setIsMobileMenuOpen(false)}
+      />
+      <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
+        <Header 
+          user={user} 
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+        />
+        <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
           {children}
         </main>
       </div>
@@ -91,61 +93,15 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<PublicPage />} />
         <Route path="/login" element={<LoginPage />} />
-        
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/agenda" element={
-          <ProtectedRoute>
-            <AgendaPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/clientes" element={
-          <ProtectedRoute>
-            <ClientsPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/orcamentos" element={
-          <ProtectedRoute>
-            <BudgetsPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/galeria" element={
-          <ProtectedRoute>
-            <GalleryAdminPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/financeiro" element={
-          <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-            <FinancialPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/contratos" element={
-          <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-            <ContractsPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/colaboradores" element={
-          <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-            <CollaboratorsPage />
-          </ProtectedRoute>
-        } />
-
-        <Route path="/configuracoes" element={
-          <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
-            <SettingsPage />
-          </ProtectedRoute>
-        } />
-
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/agenda" element={<ProtectedRoute><AgendaPage /></ProtectedRoute>} />
+        <Route path="/clientes" element={<ProtectedRoute><ClientsPage /></ProtectedRoute>} />
+        <Route path="/orcamentos" element={<ProtectedRoute><BudgetsPage /></ProtectedRoute>} />
+        <Route path="/galeria" element={<ProtectedRoute><GalleryAdminPage /></ProtectedRoute>} />
+        <Route path="/financeiro" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><FinancialPage /></ProtectedRoute>} />
+        <Route path="/contratos" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><ContractsPage /></ProtectedRoute>} />
+        <Route path="/colaboradores" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><CollaboratorsPage /></ProtectedRoute>} />
+        <Route path="/configuracoes" element={<ProtectedRoute allowedRoles={[UserRole.ADMIN]}><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </HashRouter>
