@@ -12,10 +12,10 @@ import {
   UserPlus, 
   Settings,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
   Menu,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -42,40 +42,32 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
-
-  const toggleMobile = () => {
-    setIsMobileOpen(!isMobileOpen);
+  const handleMobileClose = () => {
+    setIsMobileOpen(false);
   };
 
   return (
     <>
-      {/* Mobile Toggle Button */}
+      {/* Botão Mobile Menu */}
       <button
-        onClick={toggleMobile}
-        className="fixed top-4 left-4 z-[60] p-2 rounded-lg bg-stone-900 border border-white/10 text-stone-400 hover:text-white md:hidden"
+        onClick={() => setIsMobileOpen(true)}
+        className="fixed top-4 left-4 z-50 md:hidden p-3 rounded-lg bg-stone-900 border border-white/10 text-stone-400 hover:text-amber-500 transition-all"
       >
-        {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
+        <Menu size={20} />
       </button>
 
-      {/* Mobile Overlay */}
+      {/* Overlay Mobile */}
       {isMobileOpen && (
-        <div
-          className="fixed inset-0 z-[55] bg-black/50 md:hidden"
-          onClick={toggleMobile}
+        <div 
+          className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-40 md:hidden"
+          onClick={handleMobileClose}
         />
       )}
 
       {/* Sidebar Desktop */}
-      <div
-        className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${
-          isCollapsed ? 'w-20' : 'w-72'
-        }`}
-      >
+      <div className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
         {/* Header */}
-        <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative">
+        <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
             <>
               <h1 className="font-serif text-xl font-bold tracking-[0.2em] text-white">LATITUDE22</h1>
@@ -83,10 +75,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
             </>
           )}
           {isCollapsed && (
-            <span className="font-serif text-2xl font-bold text-white">L22</span>
+            <span className="font-serif text-2xl font-bold text-amber-600">L22</span>
           )}
           
-          {/* Toggle Button */}
+          {/* Botão de Colapso */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="absolute -right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-stone-900 border border-white/10 text-stone-500 hover:text-amber-500 hover:border-amber-500/50 transition-all"
@@ -94,21 +86,21 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
             {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
           </button>
         </div>
-
-        {/* Nav */}
-        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
+        
+        {/* Menu Items */}
+        <nav className="flex-1 space-y-1 p-6 overflow-y-auto">
           {menuItems.filter(item => item.show).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center rounded-lg px-4 py-3.5 transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20'
-                    : 'hover:bg-white/5 hover:text-white'
-                } ${isCollapsed ? 'justify-center' : 'space-x-3'}`}
                 title={isCollapsed ? item.label : ''}
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'space-x-3'} rounded-lg px-4 py-3.5 transition-all duration-200 group ${
+                  isActive 
+                    ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
+                    : 'hover:bg-white/5 hover:text-white'
+                }`}
               >
                 <span className={`${isActive ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-500'} transition-colors`}>
                   {item.icon}
@@ -120,15 +112,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
             );
           })}
         </nav>
-
-        {/* Footer */}
-        <div className={`p-4 border-t border-white/5 ${isCollapsed ? 'px-2' : 'px-6'}`}>
-          <button
-            onClick={handleLogout}
-            className={`flex w-full items-center rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group ${
-              isCollapsed ? 'justify-center' : 'space-x-3'
-            }`}
+        
+        {/* Logout */}
+        <div className="p-6 border-t border-white/5">
+          <button 
+            onClick={() => signOut(auth)}
             title={isCollapsed ? 'Encerrar Sessão' : ''}
+            className={`flex w-full items-center ${isCollapsed ? 'justify-center' : 'space-x-3'} rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group`}
           >
             <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
             {!isCollapsed && (
@@ -139,18 +129,22 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       </div>
 
       {/* Sidebar Mobile */}
-      <div
-        className={`fixed inset-y-0 left-0 z-[56] w-72 flex-col bg-stone-950 text-stone-400 border-r border-white/5 transform transition-transform duration-300 md:hidden ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
+      <div className={`fixed top-0 left-0 h-screen w-72 flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-50 md:hidden transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Header */}
-        <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50">
+        <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative">
           <h1 className="font-serif text-xl font-bold tracking-[0.2em] text-white">LATITUDE22</h1>
           <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Gerenciamento</span>
+          
+          {/* Botão Fechar Mobile */}
+          <button
+            onClick={handleMobileClose}
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-stone-500 hover:text-white transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
-
-        {/* Nav */}
+        
+        {/* Menu Items */}
         <nav className="flex-1 space-y-1 p-6 overflow-y-auto">
           {menuItems.filter(item => item.show).map((item) => {
             const isActive = location.pathname === item.path;
@@ -158,10 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={toggleMobile}
+                onClick={handleMobileClose}
                 className={`flex items-center space-x-3 rounded-lg px-4 py-3.5 transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20'
+                  isActive 
+                    ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
                     : 'hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -173,11 +167,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
             );
           })}
         </nav>
-
-        {/* Footer */}
+        
+        {/* Logout */}
         <div className="p-6 border-t border-white/5">
-          <button
-            onClick={handleLogout}
+          <button 
+            onClick={() => signOut(auth)}
             className="flex w-full items-center space-x-3 rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group"
           >
             <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
