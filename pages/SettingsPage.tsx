@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
   X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2,
-  Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type
+  Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type, Mail
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase';
