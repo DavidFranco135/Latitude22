@@ -72,6 +72,16 @@ const SettingsPage: React.FC = () => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Dados da Empresa
+  const [companyData, setCompanyData] = useState({
+    razaoSocial: '',
+    cnpj: '',
+    endereco: '',
+    telefone: '',
+    email: '',
+    website: ''
+  });
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -84,6 +94,22 @@ const SettingsPage: React.FC = () => {
       }
     };
     fetchSettings();
+  }, []);
+
+  // Carregar dados da empresa
+  useEffect(() => {
+    const loadCompanyData = async () => {
+      try {
+        const docRef = doc(db, 'settings', 'company');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCompanyData(docSnap.data() as any);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados da empresa:', error);
+      }
+    };
+    loadCompanyData();
   }, []);
 
   useEffect(() => {
@@ -221,6 +247,16 @@ const SettingsPage: React.FC = () => {
       showMessage('❌ Erro ao salvar.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveCompanyData = async () => {
+    try {
+      await setDoc(doc(db, 'settings', 'company'), companyData);
+      showMessage('✅ Dados da empresa salvos!');
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      showMessage('❌ Erro ao salvar dados da empresa');
     }
   };
 
@@ -574,6 +610,103 @@ const SettingsPage: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Dados da Empresa */}
+          <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 shadow-2xl">
+            <h3 className="font-bold text-stone-100 mb-6 flex items-center">
+              <Sparkles size={18} className="mr-2 text-amber-500" />
+              📋 Dados da Empresa
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                  Razão Social
+                </label>
+                <input
+                  type="text"
+                  value={companyData.razaoSocial}
+                  onChange={(e) => setCompanyData({...companyData, razaoSocial: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="Espaço Latitude 22 Festas & Eventos LTDA"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                    CNPJ
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.cnpj}
+                    onChange={(e) => setCompanyData({...companyData, cnpj: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                    Telefone
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.telefone}
+                    onChange={(e) => setCompanyData({...companyData, telefone: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="(21) 99999-9999"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                  Endereço Completo
+                </label>
+                <input
+                  type="text"
+                  value={companyData.endereco}
+                  onChange={(e) => setCompanyData({...companyData, endereco: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="Rua Example, 123 - Bairro - Cidade/UF - CEP"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={companyData.email}
+                    onChange={(e) => setCompanyData({...companyData, email: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="contato@latitude22.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">
+                    Website
+                  </label>
+                  <input
+                    type="text"
+                    value={companyData.website}
+                    onChange={(e) => setCompanyData({...companyData, website: e.target.value})}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="www.latitude22.com"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={saveCompanyData}
+                className="w-full py-3 bg-amber-600 text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-amber-700 transition-all"
+              >
+                💾 Salvar Dados da Empresa
+              </button>
             </div>
           </div>
 
