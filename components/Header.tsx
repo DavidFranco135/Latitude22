@@ -1,17 +1,27 @@
-
 import React from 'react';
 import { UserProfile } from '../types';
 import { Bell, Search, User } from 'lucide-react';
 
 interface HeaderProps {
   user: UserProfile;
+  onMenuClick?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user }) => {
+const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
   return (
     <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-white/5 bg-stone-900 px-4 md:px-8 shadow-md">
       <div className="flex items-center space-x-4">
-        <div className="relative md:w-64">
+        {/* Botão Menu Mobile */}
+        <button 
+          onClick={onMenuClick}
+          className="md:hidden p-2 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <div className="relative w-full md:w-64">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3">
             <Search size={18} className="text-stone-500" />
           </span>
@@ -23,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        <button className="rounded-full p-2 text-stone-500 hover:bg-stone-800 hover:text-amber-500 transition-colors">
+        <button className="hidden sm:flex rounded-full p-2 text-stone-500 hover:bg-stone-800 hover:text-amber-500 transition-colors">
           <Bell size={20} />
         </button>
         <div className="flex items-center space-x-3 border-l border-white/5 pl-4">
