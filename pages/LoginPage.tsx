@@ -127,7 +127,7 @@ const LoginPage: React.FC = () => {
         </form>
 
         <p className="text-center text-[10px] text-stone-500 uppercase tracking-widest mt-12">
-          &copy; {new Date().getFullYear()} Latitude22 Management Engine
+          &copy; {new Date().getFullYear()} Latitude22 / Produzido por NIKLAUS
         </p>
       </div>
     </div>
