@@ -8,26 +8,48 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
-  const handleMenuClick = () => {
-    console.log('🔘 Botão de menu clicado!');
+  console.log('🔵 Header renderizado. onMenuClick está definido?', !!onMenuClick);
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('═══════════════════════════════════');
+    console.log('🔘 BOTÃO DE MENU CLICADO!');
+    console.log('📱 Event:', e);
+    console.log('🎯 onMenuClick existe?', !!onMenuClick);
+    console.log('🔍 Tipo de onMenuClick:', typeof onMenuClick);
+    console.log('═══════════════════════════════════');
+    
     if (onMenuClick) {
-      console.log('✅ onMenuClick existe, executando...');
-      onMenuClick();
+      console.log('✅ Executando onMenuClick...');
+      try {
+        onMenuClick();
+        console.log('✅ onMenuClick executado com sucesso!');
+      } catch (error) {
+        console.error('❌ Erro ao executar onMenuClick:', error);
+      }
     } else {
-      console.error('❌ onMenuClick não está definido!');
+      console.error('❌ ERRO: onMenuClick não está definido!');
+      alert('ERRO: Função onMenuClick não foi passada para o Header!');
     }
   };
 
   return (
     <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-white/5 bg-stone-900 px-4 md:px-8 shadow-md">
       <div className="flex items-center space-x-4">
-        {/* Botão Menu Mobile - CORRIGIDO */}
+        {/* Botão Menu Mobile - SUPER DEBUG */}
         <button 
           onClick={handleMenuClick}
-          className="md:hidden p-2 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95"
+          onTouchStart={(e) => {
+            console.log('👆 Touch detectado no botão de menu!');
+            handleMenuClick(e as any);
+          }}
+          className="md:hidden p-3 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95 border-2 border-red-500"
           aria-label="Abrir menu"
+          style={{ minWidth: '48px', minHeight: '48px', touchAction: 'manipulation' }}
         >
-          <Menu size={24} strokeWidth={2} />
+          <Menu size={28} strokeWidth={2.5} />
         </button>
 
         <div className="relative w-full md:w-64">
