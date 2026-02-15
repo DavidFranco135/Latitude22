@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, TrendingDown, Download, Plus, Search, Filter, Calendar } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Download, Plus, Search, X } from 'lucide-react';
 import { collection, onSnapshot, addDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -14,14 +14,23 @@ interface Transaction {
   date: string;
   category: string;
   createdAt?: any;
+  appointmentId?: string;
 }
 
 const FinancialPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [formData, setFormData] = useState({
+    description: '',
+    amount: 0,
+    type: 'income' as 'income' | 'expense',
+    date: new Date().toISOString().split('T')[0],
+    category: 'Evento'
+  });
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -69,10 +78,37 @@ const FinancialPage: React.FC = () => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  const handleSave = async () => {
+    try {
+      if (!formData.description || formData.amount <= 0) {
+        alert('Preencha todos os campos corretamente!');
+        return;
+      }
+
+      console.log('💾 Salvando lançamento:', formData);
+      await addDoc(collection(db, 'financial'), {
+        ...formData,
+        createdAt: new Date()
+      });
+      
+      console.log('✅ Lançamento salvo!');
+      setShowModal(false);
+      setFormData({
+        description: '',
+        amount: 0,
+        type: 'income',
+        date: new Date().toISOString().split('T')[0],
+        category: 'Evento'
+      });
+    } catch (error) {
+      console.error('❌ Erro ao salvar:', error);
+      alert('Erro ao salvar lançamento');
+    }
+  };
+
   const exportToPDF = () => {
     const doc = new jsPDF();
     
-    // Cabeçalho
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.text('LATITUDE22', 105, 20, { align: 'center' });
@@ -91,7 +127,6 @@ const FinancialPage: React.FC = () => {
     }
     doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 105, 40, { align: 'center' });
     
-    // Resumo
     doc.setFontSize(12);
     doc.setTextColor(0);
     doc.setFont('helvetica', 'bold');
@@ -104,7 +139,6 @@ const FinancialPage: React.FC = () => {
     doc.setFont('helvetica', 'bold');
     doc.text(`Saldo: ${formatCurrency(balance)}`, 14, 70);
     
-    // Tabela de transações
     const tableData = filteredTransactions.map(t => [
       new Date(t.date).toLocaleDateString('pt-BR'),
       t.description,
@@ -130,7 +164,6 @@ const FinancialPage: React.FC = () => {
       styles: { fontSize: 9 }
     });
     
-    // Rodapé
     const pageCount = (doc as any).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -158,8 +191,12 @@ const FinancialPage: React.FC = () => {
             <Download size={16} />
             <span>Exportar PDF</span>
           </button>
-          <button className="px-8 py-3 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest shadow-xl shadow-amber-900/20 hover:bg-amber-700 transition-all">
-            Lançamento Rápido
+          <button 
+            onClick={() => setShowModal(true)}
+            className="px-8 py-3 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest shadow-xl shadow-amber-900/20 hover:bg-amber-700 transition-all flex items-center space-x-2"
+          >
+            <Plus size={18} />
+            <span>Lançamento Rápido</span>
           </button>
         </div>
       </div>
@@ -217,6 +254,7 @@ const FinancialPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Cards de Resumo */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-green-600">
           <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Receitas do Período</p>
@@ -241,6 +279,7 @@ const FinancialPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="rounded-2xl border border-white/5 bg-stone-900 p-8">
           <h3 className="text-stone-100 font-bold mb-8">Fluxo Recente</h3>
@@ -302,6 +341,114 @@ const FinancialPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Lançamento */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-stone-900 rounded-2xl border border-white/10 max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-stone-100">Novo Lançamento</h3>
+              <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-stone-800 text-stone-500 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Descrição</label>
+                <input
+                  type="text"
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="Ex: Festa de Casamento"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Valor (R$)</label>
+                <input
+                  type="number"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({...formData, amount: parseFloat(e.target.value) || 0})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                  placeholder="0,00"
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Tipo</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setFormData({...formData, type: 'income'})}
+                    className={`py-3 rounded-lg border font-bold text-xs uppercase tracking-widest transition-all ${
+                      formData.type === 'income'
+                        ? 'bg-green-600/10 border-green-600 text-green-500'
+                        : 'border-white/10 text-stone-500 hover:border-white/20'
+                    }`}
+                  >
+                    Entrada
+                  </button>
+                  <button
+                    onClick={() => setFormData({...formData, type: 'expense'})}
+                    className={`py-3 rounded-lg border font-bold text-xs uppercase tracking-widest transition-all ${
+                      formData.type === 'expense'
+                        ? 'bg-red-600/10 border-red-600 text-red-500'
+                        : 'border-white/10 text-stone-500 hover:border-white/20'
+                    }`}
+                  >
+                    Saída
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Data</label>
+                <input
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">Categoria</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                >
+                  <option value="Evento">Evento</option>
+                  <option value="Reserva">Reserva/Entrada</option>
+                  <option value="Fornecedor">Fornecedor</option>
+                  <option value="Equipe">Equipe</option>
+                  <option value="Infraestrutura">Infraestrutura</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-stone-500 hover:text-white hover:border-white/20 text-xs font-bold uppercase tracking-widest transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-xs font-bold uppercase tracking-widest hover:bg-amber-700 transition-all"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
