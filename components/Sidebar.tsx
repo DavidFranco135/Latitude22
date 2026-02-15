@@ -48,7 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
       {/* Overlay Mobile */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-[45] md:hidden"
           onClick={onMobileClose}
         />
       )}
@@ -118,7 +118,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
       </div>
 
       {/* Sidebar Mobile */}
-      <div className={`fixed top-0 left-0 h-screen w-72 flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-50 md:hidden transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-0 left-0 h-screen w-72 flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-50 md:hidden transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Header */}
         <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative">
           <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
