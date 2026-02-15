@@ -37,6 +37,10 @@ const PublicPage: React.FC = () => {
 
   const [showBudgetModal, setShowBudgetModal] = useState(false);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string>('');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [lightboxImages, setLightboxImages] = useState<any[]>([]);
   const [budgetForm, setBudgetForm] = useState({
     name: '',
     email: '',
@@ -166,6 +170,45 @@ const PublicPage: React.FC = () => {
     setIsAutoPlaying(false);
   };
 
+  // Funções do Lightbox
+  const openLightbox = (imageUrl: string, images: any[], index: number) => {
+    setLightboxImage(imageUrl);
+    setLightboxImages(images);
+    setCurrentImageIndex(index);
+    setShowLightbox(true);
+  };
+
+  const closeLightbox = () => {
+    setShowLightbox(false);
+    setLightboxImage('');
+  };
+
+  const nextImage = () => {
+    const nextIndex = (currentImageIndex + 1) % lightboxImages.length;
+    setCurrentImageIndex(nextIndex);
+    setLightboxImage(lightboxImages[nextIndex].url);
+  };
+
+  const prevImage = () => {
+    const prevIndex = (currentImageIndex - 1 + lightboxImages.length) % lightboxImages.length;
+    setCurrentImageIndex(prevIndex);
+    setLightboxImage(lightboxImages[prevIndex].url);
+  };
+
+  // Fechar lightbox com tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!showLightbox) return;
+      
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showLightbox, currentImageIndex, lightboxImages]);
+
   return (
     <div className="min-h-screen bg-stone-950 text-stone-200 selection:bg-amber-600 selection:text-white">
       {/* Navigation */}
@@ -261,7 +304,12 @@ const PublicPage: React.FC = () => {
                       <img 
                         src={slide.url} 
                         alt={slide.title || 'Slide'} 
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover cursor-pointer"
+                        onClick={() => {
+                          const imageSlides = slides.filter(s => s.type === 'image' && s.url);
+                          const currentIndex = imageSlides.findIndex(s => s.id === slide.id);
+                          openLightbox(slide.url!, imageSlides, currentIndex);
+                        }}
                       />
                       {(slide.title || slide.description) && (
                         <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent flex items-end">
@@ -686,15 +734,19 @@ const PublicPage: React.FC = () => {
             
             {photos.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {photos.map((photo) => (
-                  <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-xl bg-stone-950 border border-white/5 shadow-xl hover:border-amber-500/30 transition-all">
+                {photos.map((photo, index) => (
+                  <button
+                    key={photo.id}
+                    onClick={() => openLightbox(photo.url, photos, index)}
+                    className="group relative aspect-square overflow-hidden rounded-xl bg-stone-950 border border-white/5 shadow-xl hover:border-amber-500/30 transition-all cursor-pointer"
+                  >
                     <img 
                       src={photo.url} 
                       alt={photo.title} 
                       className="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition-all group-hover:scale-105 duration-500" 
                     />
                     
-                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-all">
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-all pointer-events-none">
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <h4 className="text-white font-bold text-sm mb-1 uppercase tracking-wide">{photo.title}</h4>
                         {photo.description && (
@@ -702,7 +754,7 @@ const PublicPage: React.FC = () => {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : (
@@ -710,6 +762,98 @@ const PublicPage: React.FC = () => {
                 <Sparkles size={64} className="mx-auto text-stone-800 mb-4" />
                 <p className="text-stone-600 text-lg">Nenhuma foto neste álbum ainda.</p>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal */}
+      {showLightbox && (
+        <div 
+          className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          {/* Botão Fechar */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-6 right-6 z-10 p-3 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all"
+          >
+            <X size={24} />
+          </button>
+
+          {/* Contador */}
+          {lightboxImages.length > 1 && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-stone-950/80 border border-white/10 text-white text-sm font-bold">
+              {currentImageIndex + 1} / {lightboxImages.length}
+            </div>
+          )}
+
+          {/* Botão Anterior */}
+          {lightboxImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                prevImage();
+              }}
+              className="absolute left-6 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all"
+            >
+              <ChevronLeftIcon size={32} />
+            </button>
+          )}
+
+          {/* Imagem */}
+          <div 
+            className="relative max-w-7xl max-h-[90vh] w-full h-full flex items-center justify-center p-20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={lightboxImage}
+              alt="Visualização"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+            />
+            
+            {/* Título e Descrição */}
+            {lightboxImages[currentImageIndex]?.title && (
+              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent rounded-b-lg">
+                <h3 className="text-white font-bold text-xl mb-2">
+                  {lightboxImages[currentImageIndex].title}
+                </h3>
+                {lightboxImages[currentImageIndex].description && (
+                  <p className="text-stone-300 text-sm">
+                    {lightboxImages[currentImageIndex].description}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Botão Próximo */}
+          {lightboxImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                nextImage();
+              }}
+              className="absolute right-6 top-1/2 -translate-y-1/2 z-10 p-4 rounded-full bg-stone-950/80 border border-white/10 text-white hover:bg-amber-600 hover:border-amber-600 transition-all"
+            >
+              <ChevronRightIcon size={32} />
+            </button>
+          )}
+
+          {/* Dica de Teclado */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex items-center gap-4 text-stone-400 text-xs">
+            <span className="flex items-center gap-2">
+              <kbd className="px-2 py-1 bg-stone-950/80 border border-white/10 rounded">ESC</kbd>
+              Fechar
+            </span>
+            {lightboxImages.length > 1 && (
+              <>
+                <span className="flex items-center gap-2">
+                  <kbd className="px-2 py-1 bg-stone-950/80 border border-white/10 rounded">←</kbd>
+                  <kbd className="px-2 py-1 bg-stone-950/80 border border-white/10 rounded">→</kbd>
+                  Navegar
+                </span>
+              </>
             )}
           </div>
         </div>
