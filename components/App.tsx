@@ -27,6 +27,14 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // DEBUG - Monitorar mudanças no estado
+  useEffect(() => {
+    console.log('═══════════════════════════════════');
+    console.log('📊 ESTADO DO MENU MOBILE MUDOU!');
+    console.log('🔵 isMobileMenuOpen:', isMobileMenuOpen);
+    console.log('═══════════════════════════════════');
+  }, [isMobileMenuOpen]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       try {
@@ -67,21 +75,55 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
   if (!user) return <Navigate to="/login" />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/dashboard" />;
 
+  // FUNÇÕES COM DEBUG
+  const handleMenuOpen = () => {
+    console.log('═══════════════════════════════════');
+    console.log('🎯 handleMenuOpen CHAMADO!');
+    console.log('📊 Estado ANTES:', isMobileMenuOpen);
+    console.log('🔄 Mudando para TRUE...');
+    setIsMobileMenuOpen(true);
+    console.log('✅ setIsMobileMenuOpen(true) executado');
+    console.log('═══════════════════════════════════');
+  };
+
+  const handleMenuClose = () => {
+    console.log('═══════════════════════════════════');
+    console.log('❌ handleMenuClose CHAMADO!');
+    console.log('📊 Estado ANTES:', isMobileMenuOpen);
+    console.log('🔄 Mudando para FALSE...');
+    setIsMobileMenuOpen(false);
+    console.log('✅ setIsMobileMenuOpen(false) executado');
+    console.log('═══════════════════════════════════');
+  };
+
+  console.log('🔄 ProtectedRoute renderizando. isMobileMenuOpen:', isMobileMenuOpen);
+
   return (
     <div className="flex h-screen overflow-hidden bg-stone-950">
       <Sidebar 
         role={user.role} 
         isMobileOpen={isMobileMenuOpen}
-        onMobileClose={() => setIsMobileMenuOpen(false)}
+        onMobileClose={handleMenuClose}
       />
       <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         <Header 
           user={user} 
-          onMenuClick={() => setIsMobileMenuOpen(true)}
+          onMenuClick={handleMenuOpen}
         />
         <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
           {children}
         </main>
+      </div>
+
+      {/* INDICADOR VISUAL DE DEBUG - REMOVER DEPOIS */}
+      <div 
+        className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold z-[9999] text-xs md:hidden shadow-xl"
+        onClick={() => {
+          console.log('🔘 Indicador clicado - forçando toggle');
+          setIsMobileMenuOpen(!isMobileMenuOpen);
+        }}
+      >
+        Menu: {isMobileMenuOpen ? '✅ ABERTO' : '❌ FECHADO'}
       </div>
     </div>
   );
