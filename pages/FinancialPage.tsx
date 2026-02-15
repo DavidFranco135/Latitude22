@@ -428,21 +428,38 @@ const FinancialPage: React.FC = () => {
                   ? filteredTransactions 
                   : filteredTransactions.filter(t => t.type === activeTab)
                 ).slice(0, 10).map((transaction) => (
-                  <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all">
-                    <div className="flex items-center space-x-4">
+                  <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all group">
+                    <div className="flex items-center space-x-4 flex-1">
                       <div className={`p-2 rounded ${transaction.type === 'income' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
                         {transaction.type === 'income' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
                       </div>
-                      <div>
+                      <div className="flex-1">
                         <p className="text-sm font-bold text-stone-200">{transaction.description}</p>
                         <p className="text-xs text-stone-600 font-medium">
                           {new Date(transaction.date).toLocaleDateString('pt-BR')} • {transaction.category}
                         </p>
                       </div>
                     </div>
-                    <p className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
-                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                        {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                      </p>
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Tem certeza que deseja deletar este lançamento?\n\n${transaction.description}\n${formatCurrency(transaction.amount)}`)) {
+                            try {
+                              await deleteDoc(doc(db, 'financial', transaction.id));
+                              console.log('🗑️ Lançamento deletado');
+                            } catch (error) {
+                              console.error('Erro ao deletar:', error);
+                            }
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-all"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )
