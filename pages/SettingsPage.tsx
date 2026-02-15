@@ -299,7 +299,7 @@ const SettingsPage: React.FC = () => {
     setNewMember({ name: '', role: '', email: '', hasAccess: false, photoUrl: '' });
   };
 
-  // SLIDES
+  // SLIDES - Upload de imagens para slides (CORRIGIDO)
   const handleSlideFileUpload = async (file: File) => {
     if (!file) return;
 
@@ -320,19 +320,27 @@ const SettingsPage: React.FC = () => {
 
     try {
       if (isImage) {
+        console.log('🔄 Iniciando upload de imagem para slide:', file.name);
         const imageUrl = await uploadToImgBB(file);
-        setNewSlide({ ...newSlide, url: imageUrl, type: 'image' });
+        console.log('✅ Upload concluído! URL:', imageUrl);
+        
+        // IMPORTANTE: Usar função callback para garantir que o estado seja atualizado
+        setNewSlide(prevSlide => ({
+          ...prevSlide,
+          url: imageUrl,
+          type: 'image'
+        }));
+        
         setUploadProgress('');
-        showMessage('✅ Imagem carregada!');
+        showMessage('✅ Imagem carregada! Agora adicione título e clique em Adicionar.');
+        console.log('✅ Estado atualizado com URL:', imageUrl);
       } else {
-        // Para vídeos, você precisará de outro serviço de upload
-        // Por enquanto, vamos permitir apenas URLs de vídeo
-        showMessage('⚠️ Para vídeos, insira a URL diretamente (YouTube, Vimeo, etc)');
+        showMessage('⚠️ Para vídeos, insira a URL diretamente');
       }
     } catch (error) {
-      console.error('Erro:', error);
+      console.error('❌ Erro no upload do slide:', error);
       setUploadProgress('');
-      showMessage('❌ Erro ao fazer upload.');
+      showMessage('❌ Erro ao fazer upload. Tente novamente.');
     } finally {
       setUploadingSlide(false);
     }
@@ -341,7 +349,10 @@ const SettingsPage: React.FC = () => {
   const handleSaveSlide = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('🔄 Tentando salvar slide. Estado atual:', newSlide);
+
     if (newSlide.type !== 'text' && !newSlide.url) {
+      console.error('❌ URL da imagem está vazia! Estado:', newSlide);
       showMessage('❌ Adicione uma imagem/vídeo ou URL!');
       return;
     }
@@ -353,21 +364,30 @@ const SettingsPage: React.FC = () => {
 
     try {
       const slideData = {
-        ...newSlide,
+        type: newSlide.type,
+        url: newSlide.url || '',
+        title: newSlide.title || '',
+        description: newSlide.description || '',
+        backgroundColor: newSlide.backgroundColor || '#0c0a09',
+        textColor: newSlide.textColor || '#e7e5e4',
         order: editingSlide ? editingSlide.order : slides.length
       };
 
+      console.log('💾 Salvando slide com dados:', slideData);
+
       if (editingSlide) {
         await updateDoc(doc(db, 'slides', editingSlide.id), slideData);
+        console.log('✅ Slide atualizado no Firestore');
         showMessage('✅ Slide atualizado!');
       } else {
-        await addDoc(collection(db, 'slides'), slideData);
+        const docRef = await addDoc(collection(db, 'slides'), slideData);
+        console.log('✅ Slide salvo no Firestore com ID:', docRef.id);
         showMessage('✅ Slide adicionado!');
       }
       closeSlideModal();
     } catch (error) {
-      console.error('Erro:', error);
-      showMessage('❌ Erro ao salvar slide.');
+      console.error('❌ Erro ao salvar slide no Firestore:', error);
+      showMessage('❌ Erro ao salvar slide. Verifique o console.');
     }
   };
 
