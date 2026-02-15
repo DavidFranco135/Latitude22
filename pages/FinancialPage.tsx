@@ -17,12 +17,30 @@ interface Transaction {
   appointmentId?: string;
 }
 
+interface Appointment {
+  id: string;
+  time: string;
+  client: string;
+  clientId?: string;
+  service: string;
+  status: 'confirmado' | 'pendente' | 'concluido' | 'cancelado' | 'pago';
+  date: string;
+  notes?: string;
+  createdAt?: any;
+  totalValue?: number;
+  depositValue?: number;
+  remainingValue?: number;
+  paymentDate?: string;
+}
+
 const FinancialPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'income' | 'expense' | 'balance' | 'receivable'>('balance');
   
   const [formData, setFormData] = useState({
     description: '',
@@ -48,6 +66,19 @@ const FinancialPage: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Listener para agendamentos (para calcular valores a receber)
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'appointments'),
+      (snapshot) => {
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+        setAppointments(items);
+      },
+      (error) => console.error('Erro ao carregar agendamentos:', error)
+    );
+    return () => unsubscribe();
+  }, []);
+
   const filteredTransactions = transactions.filter(t => {
     const tDate = new Date(t.date);
     const matchesMonth = filterMonth ? (tDate.getMonth() + 1) === parseInt(filterMonth) : true;
@@ -68,6 +99,11 @@ const FinancialPage: React.FC = () => {
     .reduce((sum, t) => sum + t.amount, 0);
 
   const balance = totalIncome - totalExpense;
+
+  // Calcular valores a receber (agendamentos com saldo restante)
+  const totalReceivable = appointments
+    .filter(apt => apt.status !== 'cancelado' && apt.status !== 'pago')
+    .reduce((sum, apt) => sum + (apt.remainingValue || 0), 0);
 
   const chartData = filteredTransactions.slice(0, 6).reverse().map(t => ({
     name: new Date(t.date).toLocaleDateString('pt-BR', { month: 'short' }),
@@ -255,28 +291,47 @@ const FinancialPage: React.FC = () => {
       </div>
 
       {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-green-600">
-          <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Receitas do Período</p>
-          <h4 className="text-3xl font-bold text-white mt-2">{formatCurrency(totalIncome)}</h4>
-          <div className="mt-4 flex items-center text-green-500 text-xs font-bold">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <button 
+          onClick={() => setActiveTab('income')}
+          className={`rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-green-600 bg-green-600/5 text-left transition-all hover:bg-green-600/10 ${activeTab === 'income' ? 'ring-2 ring-green-600' : ''}`}
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-green-600/80">Receitas Totais</p>
+          <h4 className="text-3xl font-bold text-green-500 mt-2">{formatCurrency(totalIncome)}</h4>
+          <div className="mt-4 flex items-center text-green-600 text-xs font-bold uppercase tracking-widest">
             <TrendingUp size={14} className="mr-1" /> Entradas
           </div>
-        </div>
-        <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-red-600">
-          <p className="text-xs font-bold uppercase tracking-widest text-stone-500">Despesas & Custos</p>
-          <h4 className="text-3xl font-bold text-white mt-2">{formatCurrency(totalExpense)}</h4>
-          <div className="mt-4 flex items-center text-red-500 text-xs font-bold">
+        </button>
+        <button 
+          onClick={() => setActiveTab('expense')}
+          className={`rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-red-600 bg-red-600/5 text-left transition-all hover:bg-red-600/10 ${activeTab === 'expense' ? 'ring-2 ring-red-600' : ''}`}
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-red-600/80">Despesas Totais</p>
+          <h4 className="text-3xl font-bold text-red-500 mt-2">{formatCurrency(totalExpense)}</h4>
+          <div className="mt-4 flex items-center text-red-600 text-xs font-bold uppercase tracking-widest">
             <TrendingDown size={14} className="mr-1" /> Saídas
           </div>
-        </div>
-        <div className="rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-amber-600 bg-amber-600/5">
+        </button>
+        <button 
+          onClick={() => setActiveTab('balance')}
+          className={`rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-amber-600 bg-amber-600/5 text-left transition-all hover:bg-amber-600/10 ${activeTab === 'balance' ? 'ring-2 ring-amber-600' : ''}`}
+        >
           <p className="text-xs font-bold uppercase tracking-widest text-amber-600/80">Saldo Consolidado</p>
           <h4 className="text-3xl font-bold text-amber-500 mt-2">{formatCurrency(balance)}</h4>
           <div className="mt-4 flex items-center text-amber-600 text-xs font-bold uppercase tracking-widest">
             Liquidez Imediata
           </div>
-        </div>
+        </button>
+        <button 
+          onClick={() => setActiveTab('receivable')}
+          className={`rounded-2xl border border-white/5 bg-stone-900 p-8 border-l-4 border-l-blue-600 bg-blue-600/5 text-left transition-all hover:bg-blue-600/10 ${activeTab === 'receivable' ? 'ring-2 ring-blue-600' : ''}`}
+        >
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-600/80">A Receber</p>
+          <h4 className="text-3xl font-bold text-blue-500 mt-2">{formatCurrency(totalReceivable)}</h4>
+          <div className="mt-4 flex items-center text-blue-600 text-xs font-bold uppercase tracking-widest">
+            Valores Pendentes
+          </div>
+        </button>
       </div>
 
       {/* Gráficos */}
@@ -308,35 +363,89 @@ const FinancialPage: React.FC = () => {
 
         <div className="rounded-2xl border border-white/5 bg-stone-900 overflow-hidden">
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
-            <h3 className="text-stone-100 font-bold">Lançamentos</h3>
+            <h3 className="text-stone-100 font-bold">
+              {activeTab === 'income' && 'Receitas'}
+              {activeTab === 'expense' && 'Despesas'}
+              {activeTab === 'balance' && 'Todos Lançamentos'}
+              {activeTab === 'receivable' && 'A Receber'}
+            </h3>
             <span className="text-xs text-stone-500 font-bold uppercase tracking-widest">
-              {filteredTransactions.length} itens
+              {activeTab === 'receivable' 
+                ? `${appointments.filter(apt => apt.status !== 'cancelado' && apt.status !== 'pago' && apt.remainingValue > 0).length} itens`
+                : `${activeTab === 'income' 
+                    ? filteredTransactions.filter(t => t.type === 'income').length 
+                    : activeTab === 'expense' 
+                    ? filteredTransactions.filter(t => t.type === 'expense').length 
+                    : filteredTransactions.length} itens`
+              }
             </span>
           </div>
           <div className="divide-y divide-white/5 max-h-96 overflow-y-auto">
-            {filteredTransactions.length === 0 ? (
-              <div className="p-8 text-center text-stone-600">
-                Nenhum lançamento encontrado
-              </div>
-            ) : (
-              filteredTransactions.slice(0, 10).map((transaction) => (
-                <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all">
-                  <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded ${transaction.type === 'income' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-                      {transaction.type === 'income' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-stone-200">{transaction.description}</p>
-                      <p className="text-xs text-stone-600 font-medium">
-                        {new Date(transaction.date).toLocaleDateString('pt-BR')} • {transaction.category}
+            {activeTab === 'receivable' ? (
+              // Lista de agendamentos com valores a receber
+              appointments
+                .filter(apt => apt.status !== 'cancelado' && apt.status !== 'pago' && apt.remainingValue > 0)
+                .length === 0 ? (
+                <div className="p-8 text-center text-stone-600">
+                  Nenhum valor a receber
+                </div>
+              ) : (
+                appointments
+                  .filter(apt => apt.status !== 'cancelado' && apt.status !== 'pago' && apt.remainingValue > 0)
+                  .map((appointment) => (
+                    <div key={appointment.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all">
+                      <div className="flex items-center space-x-4">
+                        <div className="p-2 rounded bg-blue-500/10 text-blue-500">
+                          <DollarSign size={16} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-stone-200">{appointment.client}</p>
+                          <p className="text-xs text-stone-600 font-medium">
+                            {new Date(appointment.date).toLocaleDateString('pt-BR')} • {appointment.service}
+                          </p>
+                          <p className="text-xs text-stone-500 mt-1">
+                            Total: {formatCurrency(appointment.totalValue || 0)} | Entrada: {formatCurrency(appointment.depositValue || 0)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm font-bold text-blue-500">
+                        {formatCurrency(appointment.remainingValue || 0)}
                       </p>
                     </div>
-                  </div>
-                  <p className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
-                    {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
-                  </p>
+                  ))
+              )
+            ) : (
+              // Lista de transações filtradas por tipo
+              (activeTab === 'balance' 
+                ? filteredTransactions 
+                : filteredTransactions.filter(t => t.type === activeTab)
+              ).length === 0 ? (
+                <div className="p-8 text-center text-stone-600">
+                  Nenhum lançamento encontrado
                 </div>
-              ))
+              ) : (
+                (activeTab === 'balance' 
+                  ? filteredTransactions 
+                  : filteredTransactions.filter(t => t.type === activeTab)
+                ).slice(0, 10).map((transaction) => (
+                  <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-white/5 transition-all">
+                    <div className="flex items-center space-x-4">
+                      <div className={`p-2 rounded ${transaction.type === 'income' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                        {transaction.type === 'income' ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-stone-200">{transaction.description}</p>
+                        <p className="text-xs text-stone-600 font-medium">
+                          {new Date(transaction.date).toLocaleDateString('pt-BR')} • {transaction.category}
+                        </p>
+                      </div>
+                    </div>
+                    <p className={`text-sm font-bold ${transaction.type === 'income' ? 'text-green-500' : 'text-red-500'}`}>
+                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                    </p>
+                  </div>
+                ))
+              )
             )}
           </div>
         </div>
