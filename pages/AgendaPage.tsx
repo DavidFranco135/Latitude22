@@ -252,8 +252,6 @@ const lancarNoFinanceiro = async (
     }
 
     // Verificar se há valores pagos
-    // Se status é 'pago', estornar o valor total
-    // Senão, estornar apenas a entrada (depositValue)
     const valorPago = appointment.status === 'pago' 
       ? (appointment.totalValue || 0) 
       : (appointment.depositValue || 0);
@@ -262,12 +260,12 @@ const lancarNoFinanceiro = async (
     
     if (valorPago > 0) {
       confirmMessage += `\n\n${appointment.status === 'pago' ? 'VALOR TOTAL PAGO' : 'VALOR DE ENTRADA'}: R$ ${valorPago.toFixed(2)}`;
-      confirmMessage += `\n\nAo cancelar, este valor será devolvido (estornado) e deduzido do financeiro.`;
+      confirmMessage += `\n\nAo cancelar, os lançamentos financeiros relacionados serão REMOVIDOS.`;
     }
     
     if (window.confirm(confirmMessage)) {
       try {
-        // 1. PRIMEIRO: Buscar e deletar todos os lançamentos financeiros deste agendamento
+        // Buscar e deletar TODOS os lançamentos financeiros deste agendamento
         const financialSnapshot = await getDocs(
           query(collection(db, 'financial'), where('appointmentId', '==', id))
         );
@@ -278,27 +276,14 @@ const lancarNoFinanceiro = async (
         );
         await Promise.all(deletePromises);
         
-        console.log(`🗑️ ${financialSnapshot.size} lançamento(s) financeiro(s) deletado(s)`);
+        console.log(`🗑️ ${financialSnapshot.size} lançamento(s) financeiro(s) removido(s)`);
         
-        // 2. SEGUNDO: Se houve pagamento, registrar estorno
-        if (valorPago > 0) {
-          await addDoc(collection(db, 'financial'), {
-            description: `ESTORNO - ${appointment.service} (${client})`,
-            amount: valorPago,
-            type: 'expense',
-            date: new Date().toISOString().split('T')[0],
-            category: 'Estorno',
-            createdAt: new Date(),
-            appointmentId: id,
-            appointmentType: 'estorno'
-          });
-          
-          console.log(`💸 Estorno de R$ ${valorPago.toFixed(2)} registrado no financeiro`);
-        }
-        
-        // 3. POR ÚLTIMO: Deletar o agendamento
+        // Deletar o agendamento
         await deleteDoc(doc(db, 'appointments', id));
-        showMessage(valorPago > 0 ? `Agendamento cancelado e R$ ${valorPago.toFixed(2)} estornado!` : 'Agendamento removido com sucesso!');
+        
+        showMessage(valorPago > 0 
+          ? `Agendamento cancelado e ${financialSnapshot.size} lançamento(s) removido(s)!` 
+          : 'Agendamento removido com sucesso!');
         setActiveMenuId(null);
       } catch (error) {
         console.error('Erro ao deletar:', error);
@@ -525,8 +510,8 @@ const lancarNoFinanceiro = async (
                         <span className="text-xs font-bold text-stone-600 uppercase tracking-widest">{hour}</span>
                       </div>
                       {appointment ? (
-                      <div className={`flex-1 rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative group hover:shadow-lg transition-all`}>
-                        <div className="relative z-10">
+                      <div className={`flex-1 rounded-xl p-4 border border-white/5 ${getStatusColor(appointment.status)} relative hover:shadow-lg transition-all`}>
+                        <div className="relative z-[1]">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-3 mb-2">
@@ -585,13 +570,26 @@ const lancarNoFinanceiro = async (
                                     )}
                                     
                                     {/* Botão Marcar como Pago */}
-                                    {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
+                                    {appointment.status !== 'pago' && appointment.status !== 'cancelado' && (appointment.remainingValue || 0) > 0 && (
                                       <button
                                         onClick={async (e) => {
                                           e.stopPropagation();
                                           setActiveMenuId(null);
-                                          if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
+                                          if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${(appointment.remainingValue || 0).toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
                                             try {
+                                              // Verifica se já existe lançamento de pagamento total
+                                              const existingPaymentQuery = query(
+                                                collection(db, 'financial'),
+                                                where('appointmentId', '==', appointment.id),
+                                                where('appointmentType', '==', 'pagamento_total')
+                                              );
+                                              const existingPaymentSnap = await getDocs(existingPaymentQuery);
+                                              
+                                              if (!existingPaymentSnap.empty) {
+                                                showMessage('⚠️ Este agendamento já foi marcado como pago!');
+                                                return;
+                                              }
+                                              
                                               // Atualiza status
                                               await updateDoc(doc(db, 'appointments', appointment.id), {
                                                 status: 'pago',
@@ -599,7 +597,7 @@ const lancarNoFinanceiro = async (
                                               });
                                               
                                               // Lança valor restante no financeiro
-                                              await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue);
+                                              await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue || 0);
                                               
                                               showMessage('✓ Pagamento registrado!');
                                             } catch (error) {
@@ -780,18 +778,31 @@ const lancarNoFinanceiro = async (
                                     </button>
                                   )}
                                   
-                                  {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
+                                  {appointment.status !== 'pago' && appointment.status !== 'cancelado' && (appointment.remainingValue || 0) > 0 && (
                                     <button
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         setActiveMenuId(null);
-                                        if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
+                                        if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${(appointment.remainingValue || 0).toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
                                           try {
+                                            // Verifica se já existe lançamento de pagamento total
+                                            const existingPaymentQuery = query(
+                                              collection(db, 'financial'),
+                                              where('appointmentId', '==', appointment.id),
+                                              where('appointmentType', '==', 'pagamento_total')
+                                            );
+                                            const existingPaymentSnap = await getDocs(existingPaymentQuery);
+                                            
+                                            if (!existingPaymentSnap.empty) {
+                                              showMessage('⚠️ Este agendamento já foi marcado como pago!');
+                                              return;
+                                            }
+                                            
                                             await updateDoc(doc(db, 'appointments', appointment.id), {
                                               status: 'pago',
                                               paymentDate: new Date().toISOString()
                                             });
-                                            await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue);
+                                            await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue || 0);
                                             showMessage('✓ Pagamento registrado!');
                                           } catch (error) {
                                             console.error('Erro:', error);
