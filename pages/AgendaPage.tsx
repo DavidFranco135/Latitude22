@@ -233,7 +233,10 @@ const lancarNoFinanceiro = async (
       service: appointment.service,
       status: appointment.status,
       date: appointment.date,
-      notes: appointment.notes || ''
+      notes: appointment.notes || '',
+      totalValue: appointment.totalValue || 0,
+      depositValue: appointment.depositValue || 0,
+      remainingValue: appointment.remainingValue || 0
     });
     setShowModal(true);
     setActiveMenuId(null);
@@ -273,7 +276,10 @@ const lancarNoFinanceiro = async (
       service: '',
       status: 'pendente',
       date: new Date().toISOString().split('T')[0],
-      notes: ''
+      notes: '',
+      totalValue: 0,
+      depositValue: 0,
+      remainingValue: 0
     });
   };
 
@@ -282,6 +288,7 @@ const lancarNoFinanceiro = async (
       confirmado: 'bg-stone-800/50 border-l-4 border-l-amber-600',
       pendente: 'bg-stone-800/30 border-l-4 border-l-blue-600',
       concluido: 'bg-stone-950 border-l-4 border-l-green-600 opacity-70',
+      pago: 'bg-stone-800/50 border-l-4 border-l-emerald-600',
       cancelado: 'bg-stone-950 border-l-4 border-l-red-600 opacity-50'
     };
     return colors[status as keyof typeof colors] || colors.pendente;
@@ -292,6 +299,7 @@ const lancarNoFinanceiro = async (
       confirmado: 'bg-amber-600/20 text-amber-500 border-amber-500/20',
       pendente: 'bg-blue-600/20 text-blue-500 border-blue-500/20',
       concluido: 'bg-green-600/20 text-green-500 border-green-500/20',
+      pago: 'bg-emerald-600/20 text-emerald-500 border-emerald-500/20',
       cancelado: 'bg-red-600/20 text-red-500 border-red-500/20'
     };
     return badges[status as keyof typeof badges] || badges.pendente;
@@ -472,6 +480,36 @@ const lancarNoFinanceiro = async (
                                         Marcar como Concluído
                                       </button>
                                     )}
+                                    
+                                    {/* Botão Marcar como Pago */}
+                                    {appointment.status !== 'pago' && appointment.status !== 'cancelado' && appointment.remainingValue > 0 && (
+                                      <button
+                                        onClick={async () => {
+                                          setActiveMenuId(null);
+                                          if (confirm(`Confirmar pagamento?\n\nValor restante: R$ ${appointment.remainingValue.toFixed(2)}\n\nIsso lançará o valor no financeiro.`)) {
+                                            try {
+                                              // Atualiza status
+                                              await updateDoc(doc(db, 'appointments', appointment.id), {
+                                                status: 'pago',
+                                                paymentDate: new Date().toISOString()
+                                              });
+                                              
+                                              // Lança valor restante no financeiro
+                                              await lancarNoFinanceiro(appointment, 'pagamento_total', appointment.remainingValue);
+                                              
+                                              showMessage('✓ Pagamento registrado!');
+                                            } catch (error) {
+                                              console.error('Erro:', error);
+                                              showMessage('Erro ao registrar pagamento');
+                                            }
+                                          }
+                                        }}
+                                        className="flex w-full items-center gap-2 px-4 py-2 text-xs text-green-400 hover:bg-green-500/10"
+                                      >
+                                        <i className="fas fa-dollar-sign w-4"></i>
+                                        <span>Marcar como Pago</span>
+                                      </button>
+                                    )}
 
                                     <div className="h-px bg-white/10 my-1"></div>
 
@@ -489,6 +527,28 @@ const lancarNoFinanceiro = async (
                           <p className="text-xs text-stone-500 mt-2 font-medium">{appointment.service}</p>
                           {appointment.notes && (
                             <p className="text-xs text-stone-600 mt-1 italic">{appointment.notes}</p>
+                          )}
+                          
+                          {/* Informações Financeiras */}
+                          {appointment.totalValue > 0 && (
+                            <div className="mt-3 pt-3 border-t border-white/5 space-y-1">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="text-stone-500">Valor Total:</span>
+                                <span className="text-stone-200 font-bold">R$ {appointment.totalValue.toFixed(2)}</span>
+                              </div>
+                              {appointment.depositValue > 0 && (
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="text-green-500">✓ Entrada Paga:</span>
+                                  <span className="text-green-400 font-bold">R$ {appointment.depositValue.toFixed(2)}</span>
+                                </div>
+                              )}
+                              {appointment.remainingValue > 0 && (
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="text-amber-500">Restante:</span>
+                                  <span className="text-amber-400 font-bold">R$ {appointment.remainingValue.toFixed(2)}</span>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -612,6 +672,7 @@ const lancarNoFinanceiro = async (
                     <option value="pendente">Pendente</option>
                     <option value="confirmado">Confirmado</option>
                     <option value="concluido">Concluído</option>
+                    <option value="pago">Pago</option>
                     <option value="cancelado">Cancelado</option>
                   </select>
                 </div>
