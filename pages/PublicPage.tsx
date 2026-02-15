@@ -215,7 +215,7 @@ const PublicPage: React.FC = () => {
       <nav className="fixed top-0 z-50 w-full border-b border-white/5 bg-stone-950/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between p-4 md:px-8">
           <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex flex-col items-center group">
-            <span className="font-serif text-2xl font-bold tracking-[0.4em] text-white group-hover:text-amber-500 transition-colors uppercase">
+            <span className="font-serif text-1xl font-bold tracking-[0.4em] text-white group-hover:text-amber-500 transition-colors uppercase">
               {settings.venueTitle}
             </span>
             <span className="text-[9px] uppercase tracking-[0.6em] text-amber-600 font-bold -mt-1">
