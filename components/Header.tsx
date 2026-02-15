@@ -49,8 +49,8 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
           className="md:hidden p-3 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95 border-2 border-amber-500"
           aria-label="Abrir menu"
           style={{ 
-            minWidth: '48px', 
-            minHeight: '48px',
+            minWidth: '20px', 
+            minHeight: '20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
