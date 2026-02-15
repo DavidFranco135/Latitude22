@@ -709,7 +709,7 @@ const SettingsPage: React.FC = () => {
 
                   <div className="flex-shrink-0">
                     {slide.type === 'image' && slide.url && (
-                      <img src={slide.url} alt={slide.title} className="w-20 h-20 object-cover rounded-lg" />
+                      <img src={slide.url} alt={slide.title} className="w-20 h-20 object-contain rounded-lg bg-stone-950" />
                     )}
                     {slide.type === 'video' && (
                       <div className="w-20 h-20 bg-stone-800 rounded-lg flex items-center justify-center">
@@ -1033,7 +1033,7 @@ const SettingsPage: React.FC = () => {
                     <div>
                       {newSlide.url && newSlide.type === 'image' && (
                         <div className="relative aspect-video rounded-xl overflow-hidden bg-stone-950 border border-white/5 mb-3">
-                          <img src={newSlide.url} alt="Preview" className="h-full w-full object-cover" />
+                          <img src={newSlide.url} alt="Preview" className="h-full w-full object-contain" />
                           <button 
                             type="button" 
                             onClick={() => setNewSlide({...newSlide, url: ''})} 
