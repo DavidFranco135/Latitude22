@@ -34,7 +34,7 @@ const SettingsPage: React.FC = () => {
     coverImage: '',
     heroImage: '',
     aboutImage: '',
-    venueTitle: 'LATITUDE22',
+    venueTitle: 'LATITUDE',
     venueSubtitle: 'Eventos & Festas',
     address: '',
     whatsapp: '',
