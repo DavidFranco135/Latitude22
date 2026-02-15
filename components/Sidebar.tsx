@@ -30,15 +30,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
   const isAdmin = role === UserRole.ADMIN;
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // DEBUG
+  useEffect(() => {
+    console.log('🔵 Sidebar - isMobileOpen:', isMobileOpen);
+  }, [isMobileOpen]);
+
   // Prevenir scroll quando menu estiver aberto
   useEffect(() => {
     if (isMobileOpen) {
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      console.log('🔒 Body scroll bloqueado');
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      console.log('🔓 Body scroll desbloqueado');
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
     };
   }, [isMobileOpen]);
 
@@ -56,25 +69,34 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
 
   return (
     <>
-      {/* Overlay Mobile - FUNCIONA EM QUALQUER ORIENTAÇÃO */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-[998] md:hidden"
-          onClick={onMobileClose}
-          style={{ 
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100vw',
-            height: '100vh'
-          }}
-        />
-      )}
+      {/* =====================================================
+          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÇÃO
+      ===================================================== */}
+      <div 
+        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
+        }`}
+        onClick={() => {
+          console.log('🔘 Overlay clicado');
+          onMobileClose?.();
+        }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh'
+        }}
+      />
 
-      {/* Sidebar Desktop */}
-      <div className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
+      {/* =====================================================
+          SIDEBAR DESKTOP
+      ===================================================== */}
+      <aside className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
         {/* Header */}
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
@@ -135,72 +157,115 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
             )}
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Sidebar Mobile - PORTRAIT E LANDSCAPE */}
-      <div 
-        className={`fixed top-0 left-0 h-full w-72 flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-[999] md:hidden transition-transform duration-300 ${
+      {/* =====================================================
+          SIDEBAR MOBILE - PORTRAIT E LANDSCAPE
+          SUPER ROBUSTO - VAI FUNCIONAR COM CERTEZA!
+      ===================================================== */}
+      <aside 
+        className={`md:hidden flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
+          bottom: 0,
+          width: '280px',
+          maxWidth: '80vw',
           height: '100vh',
+          minHeight: '100vh',
           maxHeight: '100vh',
-          overflowY: 'auto'
+          zIndex: 999,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
         }}
       >
-        {/* Header */}
-        <div className="flex h-20 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative flex-shrink-0">
+        {/* Header Compacto */}
+        <div 
+          className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950 relative"
+          style={{ 
+            height: '80px',
+            minHeight: '80px',
+            flexShrink: 0 
+          }}
+        >
           <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
+          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-0.5">& Festas</span>
           
-          {/* Botão Fechar Mobile */}
+          {/* Botão Fechar */}
           <button
-            onClick={onMobileClose}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full text-stone-500 hover:text-white transition-colors active:scale-95"
+            onClick={() => {
+              console.log('🔘 Botão X clicado');
+              onMobileClose?.();
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95"
             aria-label="Fechar menu"
+            style={{ minWidth: '44px', minHeight: '44px' }}
           >
-            <X size={22} />
+            <X size={20} strokeWidth={2} />
           </button>
         </div>
         
-        {/* Menu Items */}
-        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
+        {/* Menu Items - Com Scroll */}
+        <nav 
+          className="flex-1 space-y-0.5 p-3 overflow-y-auto"
+          style={{ 
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
           {menuItems.filter(item => item.show).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={onMobileClose}
-                className={`flex items-center space-x-3 rounded-lg px-3 py-3 transition-all duration-200 group ${
+                onClick={() => {
+                  console.log('🔘 Menu item clicado:', item.path);
+                  onMobileClose?.();
+                }}
+                className={`flex items-center space-x-3 rounded-lg px-3 py-3.5 transition-all duration-200 active:scale-95 ${
                   isActive 
                     ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
-                    : 'hover:bg-white/5 hover:text-white'
+                    : 'hover:bg-white/5 text-stone-300 hover:text-white'
                 }`}
+                style={{ minHeight: '48px' }}
               >
-                <span className={`flex-shrink-0 ${isActive ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-500'} transition-colors`}>
+                <span className={`flex-shrink-0 ${isActive ? 'text-amber-500' : 'text-stone-400'}`}>
                   {item.icon}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest">{item.label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider leading-tight">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
         
         {/* Logout */}
-        <div className="p-4 border-t border-white/5 flex-shrink-0">
+        <div 
+          className="p-3 border-t border-white/5 bg-stone-950"
+          style={{ 
+            flexShrink: 0,
+            minHeight: '70px' 
+          }}
+        >
           <button 
-            onClick={() => signOut(auth)}
-            className="flex w-full items-center space-x-3 rounded-lg px-3 py-3 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group"
+            onClick={() => {
+              console.log('🔘 Logout clicado');
+              signOut(auth);
+            }}
+            className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
+            style={{ minHeight: '48px' }}
           >
-            <LogOut size={18} className="flex-shrink-0 group-hover:-translate-x-1 transition-transform" />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
+            <LogOut size={18} className="flex-shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar Sessão</span>
           </button>
         </div>
-      </div>
+      </aside>
     </>
   );
 };
