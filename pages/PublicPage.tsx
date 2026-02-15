@@ -389,14 +389,14 @@ const PublicPage: React.FC = () => {
             <div className="inline-flex items-center space-x-2 mb-4 bg-amber-600/20 px-4 py-2 rounded-full border border-amber-600/30">
               <Sparkles size={14} className="text-amber-500" />
               <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-100">
-                Nosso Portfólio
+                Nosso Espaço
               </span>
             </div>
             <h3 className="font-serif text-4xl md:text-6xl font-bold text-white mb-4">
-              Momentos Inesquecíveis
+              Você merece um lugar assim
             </h3>
             <p className="text-stone-400 text-lg max-w-2xl mx-auto">
-              Cada evento é único. Conheça nossos trabalhos e inspire-se.
+              Cada evento é único. Confira o nosso espaço.
             </p>
           </div>
 
