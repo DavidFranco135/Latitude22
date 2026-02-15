@@ -206,7 +206,7 @@ const PublicPage: React.FC = () => {
         <div className="absolute inset-0 z-0">
           <img 
             src={settings.coverImage || settings.heroImage} 
-            className="h-full w-full object-cover opacity-40 scale-105" 
+            className="h-full w-full object-cover opacity-20 scale-50" 
             alt="Hero" 
           />
           <div className="absolute inset-0 bg-gradient-to-b from-stone-950/40 via-stone-950/60 to-stone-950"></div>
