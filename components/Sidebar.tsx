@@ -22,13 +22,14 @@ import { auth } from '../services/firebase';
 
 interface SidebarProps {
   role: UserRole;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ role }) => {
+const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileClose }) => {
   const location = useLocation();
   const isAdmin = role === UserRole.ADMIN;
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const menuItems = [
     { label: 'Visão Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
@@ -42,25 +43,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
-  const handleMobileClose = () => {
-    setIsMobileOpen(false);
-  };
-
   return (
     <>
-      {/* Botão Mobile Menu */}
-      <button
-        onClick={() => setIsMobileOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden p-3 rounded-lg bg-stone-900 border border-white/10 text-stone-400 hover:text-amber-500 transition-all"
-      >
-        <Menu size={20} />
-      </button>
-
       {/* Overlay Mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-stone-950/80 backdrop-blur-sm z-40 md:hidden"
-          onClick={handleMobileClose}
+          onClick={onMobileClose}
         />
       )}
 
@@ -70,12 +59,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
             <>
-              <h1 className="font-serif text-xl font-bold tracking-[0.2em] text-white">LATITUDE22</h1>
-              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Gerenciamento</span>
+              <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
+              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
             </>
           )}
           {isCollapsed && (
-            <span className="font-serif text-2xl font-bold text-amber-600">L22</span>
+            <span className="font-serif text-2xl font-bold text-amber-600">E&F</span>
           )}
           
           {/* Botão de Colapso */}
@@ -132,12 +121,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
       <div className={`fixed top-0 left-0 h-screen w-72 flex-col bg-stone-950 text-stone-400 border-r border-white/5 z-50 md:hidden transition-transform duration-300 ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Header */}
         <div className="flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative">
-          <h1 className="font-serif text-xl font-bold tracking-[0.2em] text-white">LATITUDE22</h1>
-          <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Gerenciamento</span>
+          <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
+          <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
           
           {/* Botão Fechar Mobile */}
           <button
-            onClick={handleMobileClose}
+            onClick={onMobileClose}
             className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full text-stone-500 hover:text-white transition-colors"
           >
             <X size={20} />
@@ -152,7 +141,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={handleMobileClose}
+                onClick={onMobileClose}
                 className={`flex items-center space-x-3 rounded-lg px-4 py-3.5 transition-all duration-200 group ${
                   isActive 
                     ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
