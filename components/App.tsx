@@ -27,6 +27,8 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  console.log('🔄 ProtectedRoute renderizado. Menu mobile está:', isMobileMenuOpen ? 'ABERTO' : 'FECHADO');
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       try {
@@ -55,6 +57,14 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
     return () => unsubscribe();
   }, []);
 
+  // DEBUG: Monitorar mudanças no estado do menu
+  useEffect(() => {
+    console.log('═══════════════════════════════════');
+    console.log('📱 ESTADO DO MENU MUDOU!');
+    console.log('🔵 isMobileMenuOpen:', isMobileMenuOpen);
+    console.log('═══════════════════════════════════');
+  }, [isMobileMenuOpen]);
+
   if (loading) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-stone-950">
@@ -67,21 +77,44 @@ const ProtectedRoute = ({ children, allowedRoles }: { children?: React.ReactNode
   if (!user) return <Navigate to="/login" />;
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/dashboard" />;
 
+  const handleMenuClick = () => {
+    console.log('═══════════════════════════════════');
+    console.log('🎯 handleMenuClick CHAMADO!');
+    console.log('📊 Estado ANTES:', isMobileMenuOpen);
+    setIsMobileMenuOpen(true);
+    console.log('📊 setIsMobileMenuOpen(true) executado');
+    console.log('═══════════════════════════════════');
+  };
+
+  const handleMenuClose = () => {
+    console.log('═══════════════════════════════════');
+    console.log('❌ handleMenuClose CHAMADO!');
+    console.log('📊 Estado ANTES:', isMobileMenuOpen);
+    setIsMobileMenuOpen(false);
+    console.log('📊 setIsMobileMenuOpen(false) executado');
+    console.log('═══════════════════════════════════');
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-stone-950">
       <Sidebar 
         role={user.role} 
         isMobileOpen={isMobileMenuOpen}
-        onMobileClose={() => setIsMobileMenuOpen(false)}
+        onMobileClose={handleMenuClose}
       />
       <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         <Header 
           user={user} 
-          onMenuClick={() => setIsMobileMenuOpen(true)}
+          onMenuClick={handleMenuClick}
         />
         <main className="p-4 md:p-8 max-w-[1600px] mx-auto w-full">
           {children}
         </main>
+      </div>
+      
+      {/* INDICADOR VISUAL DE DEBUG */}
+      <div className="fixed bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg font-bold z-[9999] md:hidden">
+        Menu: {isMobileMenuOpen ? '✅ ABERTO' : '❌ FECHADO'}
       </div>
     </div>
   );
