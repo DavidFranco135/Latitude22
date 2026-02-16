@@ -147,7 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           style={{ 
             flex: '1 1 auto',
             overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            paddingBottom: '100px'
           }}
         >
           {menuItems.filter(item => item.show).map((item) => {
@@ -183,13 +184,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           className="p-3 border-t border-white/5 bg-stone-950"
           style={{ 
             flexShrink: 0,
-            minHeight: '70px' 
+            minHeight: 'auto',
+            paddingBottom: '24px'
           }}
         >
           <button 
             onClick={() => {
               console.log('🔘 Logout clicado');
               signOut(auth);
+              onMobileClose?.();
             }}
             className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
