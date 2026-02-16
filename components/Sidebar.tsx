@@ -32,7 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
 
   // DEBUG
   useEffect(() => {
-    console.log('ðŸ”µ Sidebar - isMobileOpen:', isMobileOpen);
+    console.log('🔵 Sidebar - isMobileOpen:', isMobileOpen);
   }, [isMobileOpen]);
 
   // Prevenir scroll quando menu estiver aberto
@@ -41,12 +41,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      console.log('ðŸ”’ Body scroll bloqueado');
+      console.log('🔒 Body scroll bloqueado');
     } else {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
-      console.log('ðŸ”“ Body scroll desbloqueado');
+      console.log('🔓 Body scroll desbloqueado');
     }
     return () => {
       document.body.style.overflow = '';
@@ -56,28 +56,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
   }, [isMobileOpen]);
 
   const menuItems = [
-    { label: 'VisÃ£o Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
-    { label: 'CalendÃ¡rio de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
-    { label: 'HÃ³spedes & Clientes', path: '/clientes', icon: <Users size={18} />, show: true },
-    { label: 'OrÃ§amentos', path: '/orcamentos', icon: <FileText size={18} />, show: true },
-    { label: 'PortfÃ³lio Galeria', path: '/galeria', icon: <Image size={18} />, show: true },
+    { label: 'Visão Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
+    { label: 'Calendário de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
+    { label: 'Hóspedes & Clientes', path: '/clientes', icon: <Users size={18} />, show: true },
+    { label: 'Orçamentos', path: '/orcamentos', icon: <FileText size={18} />, show: true },
+    { label: 'Portfólio Galeria', path: '/galeria', icon: <Image size={18} />, show: true },
     { label: 'Financeiro', path: '/financeiro', icon: <DollarSign size={18} />, show: isAdmin },
     { label: 'Contratos Digitais', path: '/contratos', icon: <FileSignature size={18} />, show: isAdmin },
     { label: 'Minha Equipe', path: '/colaboradores', icon: <UserPlus size={18} />, show: isAdmin },
-    { label: 'ConfiguraÃ§Ãµes', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
+    { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
   return (
     <>
       {/* =====================================================
-          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÃ‡ÃƒO
+          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÇÃO
       ===================================================== */}
       <div 
         className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
           isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
         }`}
         onClick={() => {
-          console.log('ðŸ”˜ Overlay clicado');
+          console.log('🔘 Overlay clicado');
           onMobileClose?.();
         }}
         style={{
@@ -101,15 +101,32 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
             <>
-              <h1 className="font-serif text-lg font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">& Festas</span>
+              {/* Logo Latitude22 */}
+              <img 
+                src="/logo-latitude22.png" 
+                alt="Latitude22" 
+                className="h-16 w-auto object-contain mb-2 drop-shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.src = "/logo-latitude22-neon.svg";
+                }}
+              />
+              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Exclusividade e Requinte</span>
             </>
           )}
           {isCollapsed && (
-            <span className="font-serif text-2xl font-bold text-amber-600">E&F</span>
+            <>
+              <img 
+                src="/logo-latitude22.png" 
+                alt="L22" 
+                className="h-10 w-auto object-contain drop-shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.src = "/logo-latitude22-neon.svg";
+                }}
+              />
+            </>
           )}
           
-          {/* BotÃ£o de Colapso */}
+          {/* Botão de Colapso */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="absolute -right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-stone-900 border border-white/10 text-stone-500 hover:text-amber-500 hover:border-amber-500/50 transition-all"
@@ -148,12 +165,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         <div className="p-6 border-t border-white/5">
           <button 
             onClick={() => signOut(auth)}
-            title={isCollapsed ? 'Encerrar SessÃ£o' : ''}
+            title={isCollapsed ? 'Encerrar Sessão' : ''}
             className={`flex w-full items-center ${isCollapsed ? 'justify-center' : 'space-x-3'} rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group`}
           >
             <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
             {!isCollapsed && (
-              <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar SessÃ£o</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
             )}
           </button>
         </div>
@@ -191,13 +208,21 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
             flexShrink: 0 
           }}
         >
-          <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
-          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-0.5">& Festas</span>
+          {/* Logo Latitude22 Mobile */}
+          <img 
+            src="/logo-latitude22.png" 
+            alt="Latitude22" 
+            className="h-12 w-auto object-contain drop-shadow-lg"
+            onError={(e) => {
+              e.currentTarget.src = "/logo-latitude22-neon.svg";
+            }}
+          />
+          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
           
-          {/* BotÃ£o Fechar */}
+          {/* Botão Fechar */}
           <button
             onClick={() => {
-              console.log('ðŸ”˜ BotÃ£o X clicado');
+              console.log('🔘 Botão X clicado');
               onMobileClose?.();
             }}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95"
@@ -224,7 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
                 key={item.path}
                 to={item.path}
                 onClick={() => {
-                  console.log('ðŸ”˜ Menu item clicado:', item.path);
+                  console.log('🔘 Menu item clicado:', item.path);
                   onMobileClose?.();
                 }}
                 className={`flex items-center space-x-3 rounded-lg px-3 py-3.5 transition-all duration-200 active:scale-95 ${
@@ -255,14 +280,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         >
           <button 
             onClick={() => {
-              console.log('ðŸ”˜ Logout clicado');
+              console.log('🔘 Logout clicado');
               signOut(auth);
             }}
             className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
           >
             <LogOut size={18} className="flex-shrink-0" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar SessÃ£o</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar Sessão</span>
           </button>
         </div>
       </aside>
