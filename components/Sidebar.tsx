@@ -164,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           SUPER ROBUSTO - VAI FUNCIONAR COM CERTEZA!
       ===================================================== */}
       <aside 
-        className={`md:hidden flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
+        className={`flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
