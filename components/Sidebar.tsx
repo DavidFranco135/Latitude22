@@ -73,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÇÃO
       ===================================================== */}
       <div 
-        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm transition-opacity duration-300 ${
           isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
         }`}
         onClick={() => {
@@ -97,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           SIDEBAR MOBILE - SOMENTE MOBILE
       ===================================================== */}
       <aside 
-        className={`md:hidden flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
+        className={`flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
