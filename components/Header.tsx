@@ -42,10 +42,6 @@ const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
         {/* Botão Menu Mobile - SUPER DEBUG */}
         <button 
           onClick={handleClick}
-          onTouchStart={(e) => {
-            console.log('👆 TOUCH detectado no botão!');
-            handleClick(e as any);
-          }}
           className="md:hidden p-3 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95 border-2 border-amber-500"
           aria-label="Abrir menu"
           style={{ 
