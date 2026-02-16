@@ -67,34 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
     { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
-  // ✨ LOGO SVG INLINE - NÃO PISCA!
-  const LogoSVG = () => (
-    <svg 
-      viewBox="0 0 600 200" 
-      className={`${isCollapsed ? 'h-10' : 'h-16'} w-auto drop-shadow-lg`}
-      style={{ filter: 'drop-shadow(0 0 8px rgba(217, 119, 6, 0.6))' }}
-    >
-      {/* Fundo escuro */}
-      <rect width="600" height="200" fill="#2a2a2a" opacity="0"/>
-      
-      {/* Quadrado branco com borda */}
-      <rect x="30" y="50" width="100" height="100" fill="none" stroke="white" strokeWidth="4" rx="0"/>
-      
-      {/* L amarelo neon */}
-      <line x1="70" y1="65" x2="70" y2="155" stroke="#ffff00" strokeWidth="16" strokeLinecap="round"/>
-      <line x1="70" y1="155" x2="130" y2="155" stroke="#ffff00" strokeWidth="16" strokeLinecap="round"/>
-      
-      {/* LATITUDE 22 */}
-      <text x="210" y="120" fontFamily="Arial, sans-serif" fontSize="56" fontWeight="bold" fill="#ffff00" letterSpacing="4">
-        LATITUDE 22
-      </text>
-      
-      {/* FESTAS & EVENTOS */}
-      <text x="210" y="165" fontFamily="Arial, sans-serif" fontSize="20" fontWeight="300" fill="#cccccc" letterSpacing="3">
-        FESTAS & EVENTOS
-      </text>
-    </svg>
-  );
+
 
   return (
     <>
@@ -130,17 +103,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
             <>
-              {/* Logo Latitude22 - SVG INLINE */}
-              <div className="mb-2 h-16 flex items-center justify-center">
-                <LogoSVG />
-              </div>
-              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold">Exclusividade e Requinte</span>
+              {/* LATITUDE 22 - Apenas texto */}
+              <h1 className="font-serif text-3xl font-bold tracking-widest text-amber-500" style={{ letterSpacing: '0.15em' }}>
+                LATITUDE 22
+              </h1>
+              <span className="text-[8px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
             </>
           )}
           {isCollapsed && (
-            <div className="h-10 flex items-center justify-center">
-              <LogoSVG />
-            </div>
+            <>
+              {/* Apenas L quando colapsado */}
+              <span className="font-serif text-3xl font-bold text-amber-500">L22</span>
+            </>
           )}
           
           {/* Botão de Colapso */}
@@ -213,23 +187,25 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           maxHeight: '100vh',
           zIndex: 999,
           overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch'
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex',
+          flexDirection: 'column'
         }}
       >
         {/* Header Compacto */}
         <div 
           className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950 relative"
           style={{ 
-            height: '100px',
-            minHeight: '100px',
+            height: '90px',
+            minHeight: '90px',
             flexShrink: 0 
           }}
         >
-          {/* Logo Latitude22 Mobile - SVG INLINE */}
-          <div className="h-12 flex items-center justify-center mb-1">
-            <LogoSVG />
-          </div>
-          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold">Exclusividade e Requinte</span>
+          {/* Logo Latitude22 Mobile - Apenas texto */}
+          <h1 className="font-serif text-2xl font-bold tracking-widest text-amber-500" style={{ letterSpacing: '0.1em' }}>
+            LATITUDE 22
+          </h1>
+          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
           
           {/* Botão Fechar */}
           <button
@@ -282,18 +258,19 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           })}
         </nav>
         
-        {/* Logout */}
+        {/* Logout - SEMPRE VISÍVEL NO FUNDO */}
         <div 
-          className="p-3 border-t border-white/5 bg-stone-950"
+          className="p-4 border-t border-white/5 bg-stone-950"
           style={{ 
             flexShrink: 0,
-            minHeight: '40px' 
+            minHeight: 'auto'
           }}
         >
           <button 
             onClick={() => {
               console.log('🔘 Logout clicado');
               signOut(auth);
+              onMobileClose?.();
             }}
             className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
