@@ -164,7 +164,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           SUPER ROBUSTO - VAI FUNCIONAR COM CERTEZA!
       ===================================================== */}
       <aside 
-        className={`flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
+        className={`md:hidden flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
@@ -179,17 +179,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           maxHeight: '100vh',
           zIndex: 999,
           overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          display: 'flex',
-          flexDirection: 'column'
+          WebkitOverflowScrolling: 'touch'
         }}
       >
         {/* Header Compacto */}
         <div 
-          className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative"
+          className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950 relative"
           style={{ 
-            height: '96px',
-            minHeight: '96px',
+            height: '80px',
+            minHeight: '80px',
             flexShrink: 0 
           }}
         >
@@ -212,7 +210,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         
         {/* Menu Items - Com Scroll */}
         <nav 
-          className="flex-1 space-y-1 p-6 overflow-y-auto"
+          className="flex-1 space-y-0.5 p-3 overflow-y-auto"
           style={{ 
             flex: '1 1 auto',
             overflowY: 'auto',
@@ -229,7 +227,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
                   console.log('🔘 Menu item clicado:', item.path);
                   onMobileClose?.();
                 }}
-                className={`flex items-center space-x-3 rounded-lg px-4 py-3.5 transition-all duration-200 active:scale-95 ${
+                className={`flex items-center space-x-3 rounded-lg px-3 py-3.5 transition-all duration-200 active:scale-95 ${
                   isActive 
                     ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
                     : 'hover:bg-white/5 text-stone-300 hover:text-white'
@@ -239,7 +237,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
                 <span className={`flex-shrink-0 ${isActive ? 'text-amber-500' : 'text-stone-400'}`}>
                   {item.icon}
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-widest">
+                <span className="text-[10px] font-bold uppercase tracking-wider leading-tight">
                   {item.label}
                 </span>
               </Link>
@@ -247,25 +245,24 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           })}
         </nav>
         
-        {/* Logout - SEMPRE VISÍVEL NO FUNDO */}
+        {/* Logout */}
         <div 
-          className="p-6 border-t border-white/5"
+          className="p-3 border-t border-white/5 bg-stone-950"
           style={{ 
             flexShrink: 0,
-            minHeight: 'auto'
+            minHeight: '70px' 
           }}
         >
           <button 
             onClick={() => {
               console.log('🔘 Logout clicado');
               signOut(auth);
-              onMobileClose?.();
             }}
-            className="flex w-full items-center space-x-3 rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
+            className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
           >
             <LogOut size={18} className="flex-shrink-0" />
-            <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar Sessão</span>
           </button>
         </div>
       </aside>
