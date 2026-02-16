@@ -32,7 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
 
   // DEBUG
   useEffect(() => {
-    console.log('🔵 Sidebar - isMobileOpen:', isMobileOpen);
+    console.log('ðŸ”µ Sidebar - isMobileOpen:', isMobileOpen);
   }, [isMobileOpen]);
 
   // Prevenir scroll quando menu estiver aberto
@@ -41,12 +41,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      console.log('🔒 Body scroll bloqueado');
+      console.log('ðŸ”’ Body scroll bloqueado');
     } else {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.width = '';
-      console.log('🔓 Body scroll desbloqueado');
+      console.log('ðŸ”“ Body scroll desbloqueado');
     }
     return () => {
       document.body.style.overflow = '';
@@ -56,19 +56,43 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
   }, [isMobileOpen]);
 
   const menuItems = [
-    { label: 'Visão Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
-    { label: 'Calendário de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
-    { label: 'Hóspedes & Clientes', path: '/clientes', icon: <Users size={18} />, show: true },
-    { label: 'Orçamentos', path: '/orcamentos', icon: <FileText size={18} />, show: true },
-    { label: 'Portfólio Galeria', path: '/galeria', icon: <Image size={18} />, show: true },
+    { label: 'VisÃ£o Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
+    { label: 'CalendÃ¡rio de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
+    { label: 'HÃ³spedes & Clientes', path: '/clientes', icon: <Users size={18} />, show: true },
+    { label: 'OrÃ§amentos', path: '/orcamentos', icon: <FileText size={18} />, show: true },
+    { label: 'PortfÃ³lio Galeria', path: '/galeria', icon: <Image size={18} />, show: true },
     { label: 'Financeiro', path: '/financeiro', icon: <DollarSign size={18} />, show: isAdmin },
     { label: 'Contratos Digitais', path: '/contratos', icon: <FileSignature size={18} />, show: isAdmin },
     { label: 'Minha Equipe', path: '/colaboradores', icon: <UserPlus size={18} />, show: isAdmin },
-    { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
+    { label: 'ConfiguraÃ§Ãµes', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
   return (
     <>
+      {/* =====================================================
+          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÃ‡ÃƒO
+      ===================================================== */}
+      <div 
+        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
+        }`}
+        onClick={() => {
+          console.log('ðŸ”˜ Overlay clicado');
+          onMobileClose?.();
+        }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh'
+        }}
+      />
+
       {/* =====================================================
           SIDEBAR DESKTOP
       ===================================================== */}
@@ -85,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
             <span className="font-serif text-2xl font-bold text-amber-600">E&F</span>
           )}
           
-          {/* Botão de Colapso */}
+          {/* BotÃ£o de Colapso */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className="absolute -right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-stone-900 border border-white/10 text-stone-500 hover:text-amber-500 hover:border-amber-500/50 transition-all"
@@ -124,12 +148,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         <div className="p-6 border-t border-white/5">
           <button 
             onClick={() => signOut(auth)}
-            title={isCollapsed ? 'Encerrar Sessão' : ''}
+            title={isCollapsed ? 'Encerrar SessÃ£o' : ''}
             className={`flex w-full items-center ${isCollapsed ? 'justify-center' : 'space-x-3'} rounded-lg px-4 py-3.5 text-stone-500 hover:bg-red-900/10 hover:text-red-400 transition-all group`}
           >
             <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
             {!isCollapsed && (
-              <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar Sessão</span>
+              <span className="text-[11px] font-bold uppercase tracking-widest">Encerrar SessÃ£o</span>
             )}
           </button>
         </div>
@@ -170,10 +194,10 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
           <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-0.5">& Festas</span>
           
-          {/* Botão Fechar */}
+          {/* BotÃ£o Fechar */}
           <button
             onClick={() => {
-              console.log('🔘 Botão X clicado');
+              console.log('ðŸ”˜ BotÃ£o X clicado');
               onMobileClose?.();
             }}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95"
@@ -200,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
                 key={item.path}
                 to={item.path}
                 onClick={() => {
-                  console.log('🔘 Menu item clicado:', item.path);
+                  console.log('ðŸ”˜ Menu item clicado:', item.path);
                   onMobileClose?.();
                 }}
                 className={`flex items-center space-x-3 rounded-lg px-3 py-3.5 transition-all duration-200 active:scale-95 ${
@@ -231,14 +255,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
         >
           <button 
             onClick={() => {
-              console.log('🔘 Logout clicado');
+              console.log('ðŸ”˜ Logout clicado');
               signOut(auth);
             }}
             className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
           >
             <LogOut size={18} className="flex-shrink-0" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar Sessão</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar SessÃ£o</span>
           </button>
         </div>
       </aside>
