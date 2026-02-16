@@ -250,7 +250,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           className="p-3 border-t border-white/5 bg-stone-950"
           style={{ 
             flexShrink: 0,
-            minHeight: '70px' 
+            minHeight: 'auto' 
           }}
         >
           <button 
