@@ -70,30 +70,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
   return (
     <>
       {/* =====================================================
-          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÇÃO
-      ===================================================== */}
-      <div 
-        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
-          isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
-        }`}
-        onClick={() => {
-          console.log('🔘 Overlay clicado');
-          onMobileClose?.();
-        }}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          width: '100vw',
-          height: '100vh',
-          minHeight: '100vh',
-          maxHeight: '100vh'
-        }}
-      />
-
-      {/* =====================================================
           SIDEBAR DESKTOP
       ===================================================== */}
       <aside className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
