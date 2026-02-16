@@ -262,7 +262,7 @@ const PublicPage: React.FC = () => {
               Exclusividade & Requinte
             </span>
           </div>
-          <h2 className="mb-8 font-serif text-5xl md:text-8xl text-yellow-400 leading-tight drop-shadow-2xl">
+          <h2 className="mb-8 font-serif text-5xl md:text-8xl text-white leading-tight drop-shadow-2xl">
   Latitude22
 </h2>
 
