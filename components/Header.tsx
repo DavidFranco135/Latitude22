@@ -1,96 +1,191 @@
-import React from 'react';
-import { UserProfile } from '../types';
-import { Bell, Search, User, Menu } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { UserRole } from '../types';
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  Users, 
+  FileText, 
+  Image, 
+  DollarSign, 
+  FileSignature, 
+  UserPlus, 
+  Settings,
+  LogOut,
+  X,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { signOut } from 'firebase/auth';
+import { auth } from '../services/firebase';
 
-interface HeaderProps {
-  user: UserProfile;
-  onMenuClick?: () => void;
+interface SidebarProps {
+  role: UserRole;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ user, onMenuClick }) => {
-  console.log('🔵 Header renderizado');
-  console.log('🔍 onMenuClick existe?', !!onMenuClick);
-  console.log('🔍 Tipo de onMenuClick:', typeof onMenuClick);
+const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileClose }) => {
+  const location = useLocation();
+  const isAdmin = role === UserRole.ADMIN;
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('═══════════════════════════════════');
-    console.log('🔘 BOTÃO DE MENU CLICADO NO HEADER!');
-    console.log('📱 Event:', e.type);
-    console.log('🎯 onMenuClick existe?', !!onMenuClick);
-    console.log('═══════════════════════════════════');
-    
-    if (onMenuClick) {
-      console.log('✅ Chamando onMenuClick...');
-      try {
-        onMenuClick();
-        console.log('✅ onMenuClick executado com sucesso!');
-      } catch (error) {
-        console.error('❌ Erro ao executar onMenuClick:', error);
-      }
+  // DEBUG
+  useEffect(() => {
+    console.log('📱 Sidebar - isMobileOpen:', isMobileOpen);
+  }, [isMobileOpen]);
+
+  // Prevenir scroll quando menu estiver aberto
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      console.log('🔒 Body scroll bloqueado');
     } else {
-      console.error('❌ ERRO CRÍTICO: onMenuClick não foi passado para o Header!');
-      alert('ERRO: onMenuClick não está definido! Verifique o App.tsx');
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      console.log('🔓 Body scroll desbloqueado');
     }
-  };
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+    };
+  }, [isMobileOpen]);
+
+  const menuItems = [
+    { label: 'Visão Geral', path: '/dashboard', icon: <LayoutDashboard size={18} />, show: true },
+    { label: 'Calendário de Eventos', path: '/agenda', icon: <Calendar size={18} />, show: true },
+    { label: 'Hóspedes & Clientes', path: '/clientes', icon: <Users size={18} />, show: true },
+    { label: 'Orçamentos', path: '/orcamentos', icon: <FileText size={18} />, show: true },
+    { label: 'Portfólio Galeria', path: '/galeria', icon: <Image size={18} />, show: true },
+    { label: 'Financeiro', path: '/financeiro', icon: <DollarSign size={18} />, show: isAdmin },
+    { label: 'Contratos Digitais', path: '/contratos', icon: <FileSignature size={18} />, show: isAdmin },
+    { label: 'Minha Equipe', path: '/colaboradores', icon: <UserPlus size={18} />, show: isAdmin },
+    { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
+  ];
+
+
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 w-full items-center justify-between border-b border-white/5 bg-stone-900 px-4 md:px-8 shadow-md">
-      <div className="flex items-center space-x-4">
-        {/* Botão Menu Mobile - SUPER DEBUG */}
-        <button 
-          onClick={handleClick}
-          onTouchStart={(e) => {
-            console.log('👆 TOUCH detectado no botão!');
-            handleClick(e as any);
-          }}
-          className="md:hidden p-3 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-amber-500 transition-colors active:scale-95 border-2 border-amber-500"
-          aria-label="Abrir menu"
+    <>
+
+
+      {/* =====================================================
+          SIDEBAR MOBILE RESPONSIVA - SEM DESKTOP FIXO
+      ===================================================== */}
+      <aside 
+        className={`flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0 md:relative md:h-screen md:w-72`}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: '280px',
+          maxWidth: '80vw',
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh',
+          zIndex: 999,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+      >
+        {/* Header */}
+        <div 
+          className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950 relative"
           style={{ 
-            minWidth: '20px', 
-            minHeight: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation'
+            height: '90px',
+            minHeight: '90px',
+            flexShrink: 0 
           }}
         >
-          <Menu size={26} strokeWidth={2.5} />
-        </button>
-
-        <div className="relative w-full md:w-64">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-            <Search size={18} className="text-stone-500" />
-          </span>
-          <input
-            type="text"
-            placeholder="Pesquisar..."
-            className="w-full rounded-full border border-white/10 bg-stone-950 py-1.5 pl-10 pr-4 text-sm text-stone-200 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600 transition-all"
-          />
+          {/* Logo Latitude22 - Apenas texto */}
+          <h1 className="font-serif text-2xl font-bold tracking-widest text-amber-500" style={{ letterSpacing: '0.1em' }}>
+            LATITUDE 22
+          </h1>
+          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
+          
+          {/* Botão Fechar Mobile */}
+          <button
+            onClick={() => {
+              console.log('🔘 Botão X clicado');
+              onMobileClose?.();
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95 md:hidden"
+            aria-label="Fechar menu"
+            style={{ minWidth: '44px', minHeight: '44px' }}
+          >
+            <X size={20} strokeWidth={2} />
+          </button>
         </div>
-      </div>
-      <div className="flex items-center space-x-4">
-        <button className="hidden sm:flex rounded-full p-2 text-stone-500 hover:bg-stone-800 hover:text-amber-500 transition-colors">
-          <Bell size={20} />
-        </button>
-        <div className="flex items-center space-x-3 border-l border-white/5 pl-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-stone-100">{user.displayName}</p>
-            <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest">{user.role}</p>
-          </div>
-          <div className="h-10 w-10 overflow-hidden rounded-full bg-stone-800 flex items-center justify-center border border-amber-600/30">
-            {user.photoURL ? (
-              <img src={user.photoURL} alt={user.displayName} className="h-full w-full object-cover" />
-            ) : (
-              <User size={20} className="text-amber-500" />
-            )}
-          </div>
+        
+        {/* Menu Items - Com Scroll */}
+        <nav 
+          className="flex-1 space-y-0.5 p-3 overflow-y-auto"
+          style={{ 
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {menuItems.filter(item => item.show).map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => {
+                  console.log('🔘 Menu item clicado:', item.path);
+                  onMobileClose?.();
+                }}
+                className={`flex items-center space-x-3 rounded-lg px-3 py-3.5 transition-all duration-200 active:scale-95 ${
+                  isActive 
+                    ? 'bg-amber-600/10 text-amber-500 border border-amber-600/20' 
+                    : 'hover:bg-white/5 text-stone-300 hover:text-white'
+                }`}
+                style={{ minHeight: '48px' }}
+              >
+                <span className={`flex-shrink-0 ${isActive ? 'text-amber-500' : 'text-stone-400'}`}>
+                  {item.icon}
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wider leading-tight">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+        
+        {/* Logout - SEMPRE VISÍVEL NO FUNDO */}
+        <div 
+          className="p-4 border-t border-white/5 bg-stone-950"
+          style={{ 
+            flexShrink: 0,
+            minHeight: 'auto'
+          }}
+        >
+          <button 
+            onClick={() => {
+              console.log('🔘 Logout clicado');
+              signOut(auth);
+              onMobileClose?.();
+            }}
+            className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
+            style={{ minHeight: '48px' }}
+          >
+            <LogOut size={18} className="flex-shrink-0" />
+            <span className="text-[10px] font-bold uppercase tracking-wider">Encerrar Sessão</span>
+          </button>
         </div>
-      </div>
-    </header>
+      </aside>
+    </>
   );
 };
 
-export default Header;
+export default Sidebar;
