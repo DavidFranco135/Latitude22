@@ -94,9 +94,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
       />
 
       {/* =====================================================
-          SIDEBAR DESKTOP
+          SIDEBAR DESKTOP - APARECE QUANDO HAMBURGER CLICADO OU SEMPRE NO MD
       ===================================================== */}
-      <aside className={`hidden md:flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'}`}>
+      <aside className={`flex h-screen flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-72'} ${!isMobileOpen && 'hidden md:flex'}`}>
         {/* Header */}
         <div className={`flex h-24 flex-col items-center justify-center border-b border-white/5 bg-stone-950/50 relative`}>
           {!isCollapsed && (
