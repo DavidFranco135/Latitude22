@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { UserRole } from '../types';
 import { 
@@ -28,10 +28,11 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileClose }) => {
   const location = useLocation();
   const isAdmin = role === UserRole.ADMIN;
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // DEBUG
   useEffect(() => {
-    console.log('📱 Sidebar - isMobileOpen:', isMobileOpen);
+    console.log('🔵 Sidebar - isMobileOpen:', isMobileOpen);
   }, [isMobileOpen]);
 
   // Prevenir scroll quando menu estiver aberto
@@ -66,19 +67,40 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
     { label: 'Configurações', path: '/configuracoes', icon: <Settings size={18} />, show: isAdmin },
   ];
 
-
-
   return (
     <>
-
+      {/* =====================================================
+          OVERLAY MOBILE - FUNCIONA EM QUALQUER ORIENTAÇÃO
+      ===================================================== */}
+      <div 
+        className={`fixed inset-0 bg-stone-950/80 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          isMobileOpen ? 'opacity-100 z-[998] pointer-events-auto' : 'opacity-0 z-[-1] pointer-events-none'
+        }`}
+        onClick={() => {
+          console.log('🔘 Overlay clicado');
+          onMobileClose?.();
+        }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100vw',
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh'
+        }}
+      />
 
       {/* =====================================================
-          SIDEBAR MOBILE RESPONSIVA - SEM DESKTOP FIXO
+          SIDEBAR MOBILE - PORTRAIT E LANDSCAPE
+          SUPER ROBUSTO - VAI FUNCIONAR COM CERTEZA!
       ===================================================== */}
       <aside 
-        className={`flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
+        className={`md:hidden flex flex-col bg-stone-950 text-stone-400 border-r border-white/5 transition-transform duration-300 ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0 md:relative md:h-screen md:w-72`}
+        }`}
         style={{
           position: 'fixed',
           top: 0,
@@ -91,33 +113,28 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           maxHeight: '100vh',
           zIndex: 999,
           overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          display: 'flex',
-          flexDirection: 'column'
+          WebkitOverflowScrolling: 'touch'
         }}
       >
-        {/* Header */}
+        {/* Header Compacto */}
         <div 
           className="flex flex-col items-center justify-center border-b border-white/5 bg-stone-950 relative"
           style={{ 
-            height: '90px',
-            minHeight: '90px',
+            height: '80px',
+            minHeight: '80px',
             flexShrink: 0 
           }}
         >
-          {/* Logo Latitude22 - Apenas texto */}
-          <h1 className="font-serif text-2xl font-bold tracking-widest text-amber-500" style={{ letterSpacing: '0.1em' }}>
-            LATITUDE 22
-          </h1>
-          <span className="text-[6px] uppercase tracking-[0.3em] text-amber-600 font-bold mt-1">Exclusividade e Requinte</span>
+          <h1 className="font-serif text-base font-bold tracking-[0.3em] text-white uppercase">Eventos</h1>
+          <span className="text-[7px] uppercase tracking-[0.4em] text-amber-600 font-bold mt-0.5">& Festas</span>
           
-          {/* Botão Fechar Mobile */}
+          {/* Botão Fechar */}
           <button
             onClick={() => {
               console.log('🔘 Botão X clicado');
               onMobileClose?.();
             }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95 md:hidden"
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 transition-all active:scale-95"
             aria-label="Fechar menu"
             style={{ minWidth: '44px', minHeight: '44px' }}
           >
@@ -162,19 +179,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isMobileOpen = false, onMobileC
           })}
         </nav>
         
-        {/* Logout - SEMPRE VISÍVEL NO FUNDO */}
+        {/* Logout */}
         <div 
-          className="p-4 border-t border-white/5 bg-stone-950"
+          className="p-3 border-t border-white/5 bg-stone-950"
           style={{ 
             flexShrink: 0,
-            minHeight: 'auto'
+            minHeight: '70px' 
           }}
         >
           <button 
             onClick={() => {
               console.log('🔘 Logout clicado');
               signOut(auth);
-              onMobileClose?.();
             }}
             className="flex w-full items-center space-x-3 rounded-lg px-3 py-3.5 text-stone-400 hover:bg-red-900/10 hover:text-red-400 transition-all active:scale-95"
             style={{ minHeight: '48px' }}
