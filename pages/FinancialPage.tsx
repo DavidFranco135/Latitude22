@@ -216,8 +216,8 @@ const FinancialPage: React.FC = () => {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h2 className="font-serif text-4xl font-bold text-stone-100">Tesouraria & Cashflow</h2>
-          <p className="text-stone-500 mt-2">Gestão financeira de alta precisão para o Salão.</p>
+          <h2 className="font-serif text-4xl font-bold text-stone-100">Tesouraria LATITUDE</h2>
+          <p className="text-stone-500 mt-2">Gestão financeira de alta precisão.</p>
         </div>
         <div className="flex space-x-3">
           <button 
