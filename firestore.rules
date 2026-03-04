@@ -1,26 +1,59 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Landing Page: Configurações e Galeria são públicas para leitura
-    match /settings/{docId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-    
-    match /gallery/{docId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+
+    // Usuários
+    match /users/{userId} {
+      allow read, write: if request.auth != null;
     }
 
-    // Área Administrativa: Requer login
-    match /{document=**} {
-      allow read, write: if isAuthenticated();
+    // Agendamentos
+    match /appointments/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Clientes
+    match /clients/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Orçamentos
+    match /budgets/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Financeiro
+    match /financial/{docId} {
+      allow read, write: if request.auth != null;
+      allow create: if true; // reservas públicas podem registrar entrada
+    }
+
+    // Galeria
+    match /gallery/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Configurações do salão
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // ── RESERVAS ─────────────────────────────────────────────────────────────
+
+    // Configuração de reservas (valores, PIX, etc.)
+    match /reservaConfig/{docId} {
+      allow read: if true;              // público: formulário precisa ler
+      allow write: if request.auth != null;  // só admin escreve
+    }
+
+    // Reservas
+    match /reservas/{docId} {
+      allow read: if true;              // cliente acessa pelo token
+      allow create: if true;            // cliente cria a reserva
+      allow update: if request.auth != null; // só admin confirma/cancela
+      allow delete: if request.auth != null;
     }
   }
 }
