@@ -31,8 +31,8 @@ export interface Appointment {
   id: string;
   clientId: string;
   collaboratorId: string;
-  data: string;
-  horario: string;
+  data: string; // ISO Date
+  horario: string; // HH:mm
   status: AppointmentStatus;
   clientName?: string;
   collaboratorName?: string;
@@ -78,7 +78,10 @@ export interface SalonSettings {
   whatsapp: string;
 }
 
-// ─── SISTEMA DE RESERVAS ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ADICIONADO: Sistema de Reservas Online
+// (todo o código acima está intacto)
+// ─────────────────────────────────────────────────────────────────────────────
 
 export enum ReservaStatus {
   PENDENTE_PAGAMENTO = 'pendente_pagamento',
