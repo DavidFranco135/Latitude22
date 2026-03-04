@@ -2,10 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
   X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2,
-  Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type, Mail
+  Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type, Mail,
+  // ADICIONADO: ícones para seção de reservas
+  BookOpen, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase';
+
+// ADICIONADO
+import { getReservaConfig, saveReservaConfig } from '../services/reservas';
+import { ReservaConfig } from '../types';
 
 const IMGBB_API_KEY = '9f8d8580331d26fcb2e3fae394e63b7f';
 
@@ -82,6 +88,10 @@ const SettingsPage: React.FC = () => {
     website: ''
   });
 
+  // ADICIONADO: config de reservas
+  const [reservaConfig, setReservaConfig] = useState<ReservaConfig | null>(null);
+  const [savingReserva, setSavingReserva] = useState(false);
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -110,6 +120,11 @@ const SettingsPage: React.FC = () => {
       }
     };
     loadCompanyData();
+  }, []);
+
+  // ADICIONADO: carregar config de reservas
+  useEffect(() => {
+    getReservaConfig().then(setReservaConfig);
   }, []);
 
   useEffect(() => {
@@ -257,6 +272,21 @@ const SettingsPage: React.FC = () => {
     } catch (error) {
       console.error('Erro ao salvar:', error);
       showMessage('❌ Erro ao salvar dados da empresa');
+    }
+  };
+
+  // ADICIONADO: salvar config de reservas
+  const handleSaveReservaConfig = async () => {
+    if (!reservaConfig) return;
+    setSavingReserva(true);
+    try {
+      await saveReservaConfig(reservaConfig);
+      showMessage('✅ Configurações de reserva salvas!');
+    } catch (error) {
+      console.error('Erro:', error);
+      showMessage('❌ Erro ao salvar configurações de reserva.');
+    } finally {
+      setSavingReserva(false);
     }
   };
 
@@ -994,6 +1024,83 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          ADICIONADO: Configurações de Reservas Online
+          (tudo acima está idêntico ao original)
+      ══════════════════════════════════════════════════════════════════ */}
+      {reservaConfig && (
+        <div className="rounded-2xl border border-amber-600/20 bg-stone-900 p-8 shadow-2xl">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-stone-100 text-lg flex items-center">
+              <BookOpen size={20} className="mr-2 text-amber-500" />
+              Configurações de Reservas Online
+            </h3>
+            <button
+              onClick={() => setReservaConfig(c => c ? { ...c, reservaOnlineAtiva: !c.reservaOnlineAtiva } : c)}
+              className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+            >
+              {reservaConfig.reservaOnlineAtiva
+                ? <><ToggleRight size={28} className="text-amber-500" /><span className="text-amber-500">Ativo</span></>
+                : <><ToggleLeft size={28} className="text-stone-600" /><span className="text-stone-500">Inativo</span></>
+              }
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { key: 'valorDiaUtil',      label: 'Valor Dia Útil (R$)' },
+              { key: 'valorSabado',       label: 'Valor Sábado (R$)' },
+              { key: 'valorDomingo',      label: 'Valor Domingo (R$)' },
+              { key: 'valorFimDeSemana',  label: 'Valor Fim de Semana (R$)' },
+              { key: 'percentualReserva', label: 'Percentual de Reserva (%)' },
+              { key: 'expiracaoHoras',    label: 'Expiração do Link (horas)' }
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
+                <input
+                  type="number"
+                  value={(reservaConfig as any)[key] ?? ''}
+                  onChange={e => setReservaConfig(c => c ? { ...c, [key]: Number(e.target.value) } : c)}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            {[
+              { key: 'whatsappLink',  label: 'Link do WhatsApp',   placeholder: 'https://wa.me/55219...' },
+              { key: 'pixChave',      label: 'Chave PIX',          placeholder: 'CPF, e-mail, telefone ou chave aleatória' },
+              { key: 'salonNome',     label: 'Nome do Salão (PDF)',  placeholder: 'Salão Latitude22' },
+              { key: 'salonCnpj',     label: 'CNPJ (PDF)',         placeholder: '00.000.000/0001-00' },
+              { key: 'salonContato',  label: 'Contato (PDF)',       placeholder: '(21) 99999-9999' }
+            ].map(({ key, label, placeholder }) => (
+              <div key={key}>
+                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
+                <input
+                  type="text"
+                  value={(reservaConfig as any)[key] ?? ''}
+                  onChange={e => setReservaConfig(c => c ? { ...c, [key]: e.target.value } : c)}
+                  placeholder={placeholder}
+                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none placeholder:text-stone-600"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={handleSaveReservaConfig}
+              disabled={savingReserva}
+              className="flex items-center gap-3 rounded-lg bg-amber-600 px-10 py-4 text-xs font-bold uppercase tracking-widest text-white hover:bg-amber-700 shadow-xl shadow-amber-900/40 disabled:opacity-50 transition-all"
+            >
+              <Save size={16} />
+              {savingReserva ? 'Salvando...' : 'Salvar Configurações de Reserva'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Membro */}
       {showMemberModal && (
