@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   COLLABORATOR = 'COLLABORATOR'
@@ -32,8 +31,8 @@ export interface Appointment {
   id: string;
   clientId: string;
   collaboratorId: string;
-  data: string; // ISO Date
-  horario: string; // HH:mm
+  data: string;
+  horario: string;
   status: AppointmentStatus;
   clientName?: string;
   collaboratorName?: string;
@@ -77,4 +76,61 @@ export interface SalonSettings {
   contact: string;
   instagram: string;
   whatsapp: string;
+}
+
+// ─── SISTEMA DE RESERVAS ────────────────────────────────────────────────────
+
+export enum ReservaStatus {
+  PENDENTE_PAGAMENTO = 'pendente_pagamento',
+  RESERVADO = 'reservado',
+  CONFIRMADO = 'confirmado',
+  CANCELADO = 'cancelado',
+  EXPIRADO = 'expirado'
+}
+
+export type TipoDiaria = 'util' | 'sabado' | 'domingo' | 'fimdesemana';
+
+export interface ReservaConfig {
+  id?: string;
+  valorDiaUtil: number;
+  valorSabado: number;
+  valorDomingo: number;
+  valorFimDeSemana: number;
+  percentualReserva: number;
+  whatsappLink: string;
+  reservaOnlineAtiva: boolean;
+  pagamentoAutomaticoAtivo: boolean;
+  expiracaoHoras: number;
+  mercadoPagoPublicKey?: string;
+  mercadoPagoAccessToken?: string;
+  salonNome?: string;
+  salonCnpj?: string;
+  salonContato?: string;
+  pixChave?: string;
+}
+
+export interface Reserva {
+  id: string;
+  token: string;
+  data: string;
+  tipoDiaria: TipoDiaria;
+  valorTotal: number;
+  valorReserva: number;
+  percentualReserva: number;
+  status: ReservaStatus;
+  clienteNome: string;
+  clienteCpfCnpj: string;
+  clienteTelefone: string;
+  clienteEmail: string;
+  tipoEvento: string;
+  numConvidados: number;
+  protocolo?: string;
+  valorPago?: number;
+  formaPagamento?: string;
+  dataPagamento?: any;
+  transacaoId?: string;
+  mpPreferenceId?: string;
+  createdAt: any;
+  expiresAt?: any;
+  criadoPorAdmin?: boolean;
 }
