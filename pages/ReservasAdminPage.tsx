@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link2, Copy, XCircle, DollarSign, FileText, Search, RefreshCw, Calendar, CheckCircle } from 'lucide-react';
+import { Link2, Copy, CheckCircle, XCircle, Clock, DollarSign,
+  FileText, Search, Filter, RefreshCw, Calendar } from 'lucide-react';
 import {
   getAllReservas, getReservaConfig, confirmarPagamento,
   cancelarReserva, criarReserva, calcularTipoDiaria, calcularValor
@@ -27,24 +28,24 @@ const STATUS_LABEL: Record<ReservaStatus, string> = {
 };
 
 const ReservasAdminPage: React.FC = () => {
-  const [reservas, setReservas]   = useState<Reserva[]>([]);
-  const [config, setConfig]       = useState<ReservaConfig | null>(null);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
-  const [filtroStatus, setFiltro] = useState<ReservaStatus | 'todos'>('todos');
-  const [copied, setCopied]       = useState('');
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [config, setConfig] = useState<ReservaConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState<ReservaStatus | 'todos'>('todos');
+  const [copied, setCopied] = useState('');
 
-  // Modal pagamento
-  const [modalPgto, setModalPgto]       = useState<Reserva | null>(null);
-  const [valorPago, setValorPago]       = useState('');
-  const [formaPgto, setFormaPgto]       = useState('PIX');
-  const [transacaoId, setTransacaoId]   = useState('');
-  const [confirmando, setConfirmando]   = useState(false);
+  // Modal confirmar pagamento
+  const [modalPagamento, setModalPagamento] = useState<Reserva | null>(null);
+  const [valorPago, setValorPago] = useState('');
+  const [formaPagamento, setFormaPagamento] = useState('PIX');
+  const [transacaoId, setTransacaoId] = useState('');
+  const [confirmando, setConfirmando] = useState(false);
 
-  // Modal link manual
-  const [modalLink, setModalLink]     = useState(false);
-  const [dataLink, setDataLink]       = useState('');
-  const [linkGerado, setLinkGerado]   = useState('');
+  // Modal gerar link manual
+  const [modalLink, setModalLink] = useState(false);
+  const [dataLink, setDataLink] = useState('');
+  const [linkGerado, setLinkGerado] = useState('');
   const [gerandoLink, setGerandoLink] = useState(false);
 
   const carregar = async () => {
@@ -61,17 +62,23 @@ const ReservasAdminPage: React.FC = () => {
   useEffect(() => { carregar(); }, []);
 
   const copiarLink = (token: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/#/reserva/${token}`);
+    const link = `${window.location.origin}/#/reserva/${token}`;
+    navigator.clipboard.writeText(link);
     setCopied(token);
     setTimeout(() => setCopied(''), 2500);
   };
 
   const handleConfirmar = async () => {
-    if (!modalPgto || !valorPago) return;
+    if (!modalPagamento || !valorPago) return;
     setConfirmando(true);
     try {
-      await confirmarPagamento(modalPgto.id, Number(valorPago), formaPgto, transacaoId || undefined);
-      setModalPgto(null);
+      await confirmarPagamento(
+        modalPagamento.id,
+        Number(valorPago),
+        formaPagamento,
+        transacaoId || undefined
+      );
+      setModalPagamento(null);
       setValorPago('');
       setTransacaoId('');
       carregar();
@@ -83,7 +90,7 @@ const ReservasAdminPage: React.FC = () => {
   };
 
   const handleCancelar = async (id: string) => {
-    if (!confirm('Cancelar esta reserva?')) return;
+    if (!confirm('Tem certeza que deseja cancelar esta reserva?')) return;
     await cancelarReserva(id);
     carregar();
   };
@@ -93,11 +100,13 @@ const ReservasAdminPage: React.FC = () => {
     setGerandoLink(true);
     try {
       const tipo = calcularTipoDiaria(dataLink);
-      const r    = await criarReserva(dataLink, tipo, config,
+      const reserva = await criarReserva(
+        dataLink, tipo, config,
         { nome: 'A definir', cpfCnpj: '', telefone: '', email: '', tipoEvento: '', numConvidados: 0 },
         true
       );
-      setLinkGerado(`${window.location.origin}/#/reserva/${r.token}`);
+      const link = `${window.location.origin}/#/reserva/${reserva.token}`;
+      setLinkGerado(link);
       carregar();
     } catch (e: any) {
       alert(e.message);
@@ -107,36 +116,40 @@ const ReservasAdminPage: React.FC = () => {
   };
 
   const filtradas = reservas.filter(r => {
-    const q = search.toLowerCase();
     const matchSearch =
-      r.clienteNome.toLowerCase().includes(q) ||
-      r.data.includes(q) ||
-      (r.protocolo || '').includes(q) ||
-      r.token.includes(q);
+      r.clienteNome.toLowerCase().includes(search.toLowerCase()) ||
+      r.data.includes(search) ||
+      (r.protocolo || '').includes(search) ||
+      r.token.includes(search);
     const matchStatus = filtroStatus === 'todos' || r.status === filtroStatus;
     return matchSearch && matchStatus;
   });
 
-  const totalReceita = reservas
+  const totalReservado = reservas
     .filter(r => [ReservaStatus.RESERVADO, ReservaStatus.CONFIRMADO].includes(r.status))
     .reduce((s, r) => s + (r.valorPago || 0), 0);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
+
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-600 mb-1">Gestão</p>
-          <h2 className="font-serif text-4xl font-bold text-stone-100 tracking-tight">Reservas Online</h2>
+          <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-amber-600 mb-1">
+            Gestão
+          </p>
+          <h2 className="font-serif text-4xl font-bold text-stone-100 tracking-tight">
+            Reservas Online
+          </h2>
         </div>
         <div className="flex gap-3">
           <button onClick={carregar}
             className="p-2.5 rounded-lg border border-white/10 text-stone-400 hover:text-white hover:border-white/20 transition-all">
-            <RefreshCw size={16}/>
+            <RefreshCw size={16} />
           </button>
           <button onClick={() => { setModalLink(true); setLinkGerado(''); setDataLink(''); }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-600/10 border border-amber-600/20 text-amber-500 text-xs font-bold uppercase tracking-widest hover:bg-amber-600/20 transition-all">
-            <Link2 size={14}/>Gerar Link Manual
+            <Link2 size={14} />Gerar Link Manual
           </button>
         </div>
       </div>
@@ -144,10 +157,10 @@ const ReservasAdminPage: React.FC = () => {
       {/* STATS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total',       val: reservas.length,                                                                          color: 'text-white' },
-          { label: 'Pendentes',   val: reservas.filter(r => r.status === ReservaStatus.PENDENTE_PAGAMENTO).length,               color: 'text-amber-400' },
-          { label: 'Confirmados', val: reservas.filter(r => r.status === ReservaStatus.CONFIRMADO).length,                      color: 'text-green-400' },
-          { label: 'Receita',     val: fmt(totalReceita),                                                                         color: 'text-green-400' }
+          { label: 'Total', val: reservas.length, color: 'text-white' },
+          { label: 'Pendentes', val: reservas.filter(r => r.status === ReservaStatus.PENDENTE_PAGAMENTO).length, color: 'text-amber-400' },
+          { label: 'Confirmados', val: reservas.filter(r => r.status === ReservaStatus.CONFIRMADO).length, color: 'text-green-400' },
+          { label: 'Receita', val: fmt(totalReservado), color: 'text-green-400' }
         ].map(({ label, val, color }) => (
           <div key={label} className="glass p-5 rounded-xl">
             <p className="text-[9px] text-stone-500 uppercase tracking-widest">{label}</p>
@@ -159,12 +172,17 @@ const ReservasAdminPage: React.FC = () => {
       {/* FILTROS */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500"/>
-          <input value={search} onChange={e => setSearch(e.target.value)}
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nome, data, protocolo..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-white/10 bg-stone-900 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"/>
+            className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-white/10 bg-stone-900 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
+          />
         </div>
-        <select value={filtroStatus} onChange={e => setFiltro(e.target.value as any)}
+        <select
+          value={filtroStatus}
+          onChange={e => setFiltroStatus(e.target.value as any)}
           className="px-4 py-2.5 rounded-lg border border-white/10 bg-stone-900 text-sm text-white focus:border-amber-500/50 focus:outline-none">
           <option value="todos">Todos os status</option>
           {Object.values(ReservaStatus).map(s => (
@@ -176,11 +194,11 @@ const ReservasAdminPage: React.FC = () => {
       {/* LISTA */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-600 border-t-transparent"/>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
         </div>
       ) : filtradas.length === 0 ? (
         <div className="text-center py-16 text-stone-600">
-          <Calendar size={40} className="mx-auto mb-3 opacity-30"/>
+          <Calendar size={40} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Nenhuma reserva encontrada.</p>
         </div>
       ) : (
@@ -193,19 +211,28 @@ const ReservasAdminPage: React.FC = () => {
                     <span className={`text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${STATUS_COLORS[r.status]}`}>
                       {STATUS_LABEL[r.status]}
                     </span>
-                    {r.protocolo && <span className="text-[9px] text-stone-500 font-mono">{r.protocolo}</span>}
+                    {r.protocolo && (
+                      <span className="text-[9px] text-stone-500 font-mono">{r.protocolo}</span>
+                    )}
                     {r.criadoPorAdmin && (
-                      <span className="text-[9px] text-amber-700 bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-800/30">Admin</span>
+                      <span className="text-[9px] text-amber-700 bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-800/30">
+                        Admin
+                      </span>
                     )}
                   </div>
+
                   <div className="flex flex-wrap gap-x-6 gap-y-1">
                     <div>
                       <p className="text-[9px] text-stone-500 uppercase tracking-widest">Data</p>
-                      <p className="text-sm font-bold text-white">{r.data.split('-').reverse().join('/')}</p>
+                      <p className="text-sm font-bold text-white">
+                        {r.data.split('-').reverse().join('/')}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-stone-500 uppercase tracking-widest">Cliente</p>
-                      <p className="text-sm font-bold text-white truncate max-w-[200px]">{r.clienteNome || '—'}</p>
+                      <p className="text-sm font-bold text-white truncate max-w-[200px]">
+                        {r.clienteNome || '—'}
+                      </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-stone-500 uppercase tracking-widest">Valor Total</p>
@@ -220,30 +247,43 @@ const ReservasAdminPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* AÇÕES */}
                 <div className="flex flex-wrap gap-2">
-                  <button onClick={() => copiarLink(r.token)} title="Copiar link"
+                  <button
+                    onClick={() => copiarLink(r.token)}
+                    title="Copiar link"
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/10 text-stone-400 hover:text-amber-500 hover:border-amber-600/30 text-xs font-bold transition-all">
-                    <Copy size={13}/>{copied === r.token ? 'Copiado!' : 'Link'}
+                    <Copy size={13} />
+                    {copied === r.token ? 'Copiado!' : 'Link'}
                   </button>
 
-                  {(r.status === ReservaStatus.PENDENTE_PAGAMENTO || r.status === ReservaStatus.RESERVADO) && (
-                    <button onClick={() => { setModalPgto(r); setValorPago(String(r.valorReserva)); }}
+                  {(r.status === ReservaStatus.PENDENTE_PAGAMENTO ||
+                    r.status === ReservaStatus.RESERVADO) && (
+                    <button
+                      onClick={() => {
+                        setModalPagamento(r);
+                        setValorPago(String(r.valorReserva));
+                      }}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-green-900/20 border border-green-800/30 text-green-400 hover:bg-green-900/30 text-xs font-bold transition-all">
-                      <DollarSign size={13}/>Confirmar Pgto
+                      <DollarSign size={13} />Confirmar Pgto
                     </button>
                   )}
 
-                  {(r.status === ReservaStatus.CONFIRMADO || r.status === ReservaStatus.RESERVADO) && config && (
-                    <button onClick={() => gerarComprovantePDF(r, config)}
+                  {(r.status === ReservaStatus.CONFIRMADO ||
+                    r.status === ReservaStatus.RESERVADO) && config && (
+                    <button
+                      onClick={() => gerarComprovantePDF(r, config)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-white/10 text-stone-400 hover:text-white text-xs font-bold transition-all">
-                      <FileText size={13}/>PDF
+                      <FileText size={13} />PDF
                     </button>
                   )}
 
-                  {r.status !== ReservaStatus.CANCELADO && r.status !== ReservaStatus.EXPIRADO && (
-                    <button onClick={() => handleCancelar(r.id)}
+                  {r.status !== ReservaStatus.CANCELADO &&
+                    r.status !== ReservaStatus.EXPIRADO && (
+                    <button
+                      onClick={() => handleCancelar(r.id)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-900/10 border border-red-900/30 text-red-500 hover:bg-red-900/20 text-xs font-bold transition-all">
-                      <XCircle size={13}/>Cancelar
+                      <XCircle size={13} />Cancelar
                     </button>
                   )}
                 </div>
@@ -254,38 +294,44 @@ const ReservasAdminPage: React.FC = () => {
       )}
 
       {/* MODAL — CONFIRMAR PAGAMENTO */}
-      {modalPgto && (
+      {modalPagamento && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="glass rounded-2xl p-6 w-full max-w-md space-y-5">
             <h3 className="font-bold text-white text-lg">Confirmar Pagamento</h3>
             <div className="bg-stone-900 rounded-lg p-4 space-y-1 text-sm">
-              <p className="text-stone-300"><span className="text-stone-500">Cliente:</span> {modalPgto.clienteNome}</p>
-              <p className="text-stone-300"><span className="text-stone-500">Data:</span> {modalPgto.data.split('-').reverse().join('/')}</p>
-              <p className="text-stone-300"><span className="text-stone-500">Total:</span> {fmt(modalPgto.valorTotal)}</p>
+              <p className="text-stone-300"><span className="text-stone-500">Cliente:</span> {modalPagamento.clienteNome}</p>
+              <p className="text-stone-300"><span className="text-stone-500">Data:</span> {modalPagamento.data.split('-').reverse().join('/')}</p>
+              <p className="text-stone-300"><span className="text-stone-500">Total:</span> {fmt(modalPagamento.valorTotal)}</p>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Valor Recebido (R$) *</label>
-                <input type="number" value={valorPago} onChange={e => setValorPago(e.target.value)}
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">
+                  Valor Recebido (R$) *
+                </label>
+                <input type="number" value={valorPago}
+                  onChange={e => setValorPago(e.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none"
-                  placeholder="0,00"/>
+                  placeholder="0,00" />
                 <div className="flex gap-2 mt-1.5">
-                  <button onClick={() => setValorPago(String(modalPgto.valorReserva))}
+                  <button onClick={() => setValorPago(String(modalPagamento.valorReserva))}
                     className="text-[10px] text-amber-500 hover:text-amber-400">
-                    {fmt(modalPgto.valorReserva)} (reserva)
+                    {fmt(modalPagamento.valorReserva)} (reserva)
                   </button>
                   <span className="text-stone-700">·</span>
-                  <button onClick={() => setValorPago(String(modalPgto.valorTotal))}
+                  <button onClick={() => setValorPago(String(modalPagamento.valorTotal))}
                     className="text-[10px] text-amber-500 hover:text-amber-400">
-                    {fmt(modalPgto.valorTotal)} (total)
+                    {fmt(modalPagamento.valorTotal)} (total)
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Forma de Pagamento</label>
-                <select value={formaPgto} onChange={e => setFormaPgto(e.target.value)}
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">
+                  Forma de Pagamento
+                </label>
+                <select value={formaPagamento}
+                  onChange={e => setFormaPagamento(e.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none">
                   <option>PIX</option>
                   <option>Dinheiro</option>
@@ -297,15 +343,18 @@ const ReservasAdminPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">ID da Transação (opcional)</label>
-                <input type="text" value={transacaoId} onChange={e => setTransacaoId(e.target.value)}
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">
+                  ID da Transação (opcional)
+                </label>
+                <input type="text" value={transacaoId}
+                  onChange={e => setTransacaoId(e.target.value)}
                   className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
-                  placeholder="Código do comprovante PIX..."/>
+                  placeholder="Código do comprovante PIX..." />
               </div>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setModalPgto(null)}
+              <button onClick={() => setModalPagamento(null)}
                 className="flex-1 py-3 rounded-lg border border-white/10 text-stone-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-all">
                 Cancelar
               </button>
@@ -313,7 +362,7 @@ const ReservasAdminPage: React.FC = () => {
                 className="flex-1 py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                 {confirmando
                   ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>Confirmando...</>
-                  : <><CheckCircle size={15}/>Confirmar</>}
+                  : <><CheckCircle size={15} />Confirmar</>}
               </button>
             </div>
           </div>
@@ -325,37 +374,47 @@ const ReservasAdminPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="glass rounded-2xl p-6 w-full max-w-md space-y-5">
             <h3 className="font-bold text-white text-lg">Gerar Link de Reserva</h3>
-            <p className="text-xs text-stone-400">Gere um link exclusivo para enviar ao cliente. Os dados serão preenchidos pelo cliente ao acessar.</p>
+            <p className="text-xs text-stone-400">
+              Gere um link exclusivo para enviar ao cliente. Os dados do cliente serão preenchidos pelo próprio cliente ao acessar.
+            </p>
 
             <div>
-              <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Data do Evento *</label>
+              <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">
+                Data do Evento *
+              </label>
               <input type="date" value={dataLink}
                 min={new Date().toISOString().split('T')[0]}
                 onChange={e => { setDataLink(e.target.value); setLinkGerado(''); }}
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none"/>
+                className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none" />
             </div>
 
-            {dataLink && config && (() => {
-              const tipo   = calcularTipoDiaria(dataLink);
-              const total  = calcularValor(tipo, config);
-              const reserva = Math.ceil(total * config.percentualReserva / 100);
-              const tipoLbl: Record<string,string> = { util:'Dia Útil', sabado:'Sábado', domingo:'Domingo', fimdesemana:'Fim de Semana' };
-              return (
-                <div className="bg-stone-900 rounded-lg p-4 text-sm space-y-1">
-                  <p className="text-stone-300"><span className="text-stone-500">Tipo:</span> {tipoLbl[tipo]}</p>
-                  <p className="text-stone-300"><span className="text-stone-500">Valor Total:</span> <span className="text-amber-500 font-bold">{fmt(total)}</span></p>
-                  <p className="text-stone-300"><span className="text-stone-500">Reserva ({config.percentualReserva}%):</span> {fmt(reserva)}</p>
-                </div>
-              );
-            })()}
+            {dataLink && config && (
+              <div className="bg-stone-900 rounded-lg p-4 text-sm space-y-1">
+                {(() => {
+                  const tipo = calcularTipoDiaria(dataLink);
+                  const total = calcularValor(tipo, config);
+                  const reserva = Math.ceil(total * config.percentualReserva / 100);
+                  const tipoLabel: Record<string, string> = {
+                    util: 'Dia Útil', sabado: 'Sábado', domingo: 'Domingo', fimdesemana: 'Fim de Semana'
+                  };
+                  return <>
+                    <p className="text-stone-300"><span className="text-stone-500">Tipo:</span> {tipoLabel[tipo]}</p>
+                    <p className="text-stone-300"><span className="text-stone-500">Valor Total:</span> <span className="text-amber-500 font-bold">{fmt(total)}</span></p>
+                    <p className="text-stone-300"><span className="text-stone-500">Reserva ({config.percentualReserva}%):</span> {fmt(reserva)}</p>
+                  </>;
+                })()}
+              </div>
+            )}
 
             {linkGerado ? (
               <div className="bg-stone-900 rounded-lg p-4 border border-amber-600/20">
                 <p className="text-[9px] text-stone-500 uppercase tracking-widest mb-2">Link gerado</p>
                 <p className="text-xs text-stone-300 break-all mb-3">{linkGerado}</p>
-                <button onClick={() => { navigator.clipboard.writeText(linkGerado); setCopied('modal'); setTimeout(() => setCopied(''), 2000); }}
+                <button
+                  onClick={() => { navigator.clipboard.writeText(linkGerado); setCopied('modal'); setTimeout(() => setCopied(''), 2000); }}
                   className="flex items-center gap-1.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                  <Copy size={13}/>{copied === 'modal' ? 'Copiado!' : 'Copiar link'}
+                  <Copy size={13} />
+                  {copied === 'modal' ? 'Copiado!' : 'Copiar link'}
                 </button>
               </div>
             ) : (
@@ -363,7 +422,7 @@ const ReservasAdminPage: React.FC = () => {
                 className="w-full py-3.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                 {gerandoLink
                   ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>Gerando...</>
-                  : <><Link2 size={14}/>Gerar Link</>}
+                  : <><Link2 size={14} />Gerar Link</>}
               </button>
             )}
 
