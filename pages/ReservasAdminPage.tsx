@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Link2, Copy, CheckCircle, XCircle, DollarSign,
   FileText, Search, RefreshCw, Calendar, MessageCircle,
-  Send, AlertCircle, ChevronDown, ChevronUp, User
+  Send, AlertCircle, ChevronDown, ChevronUp, User,
+  Plus, Trash2, Paperclip, Image, X, ExternalLink, UserCheck, Globe
 } from 'lucide-react';
 import {
   getAllReservas, getReservaConfig, confirmarPagamento,
@@ -60,11 +61,22 @@ const ReservasAdminPage: React.FC = () => {
   const [confirmando,    setConfirmando]    = useState(false);
   const [pdfGerado,      setPdfGerado]      = useState(false);
 
+  // Comprovante de pagamento (upload de arquivo)
+  const [comprovanteFile,     setComprovanteFile]     = useState<File | null>(null);
+  const [comprovantePreview,  setComprovantePreview]  = useState<string | null>(null);
+  const comprovanteInputRef = useRef<HTMLInputElement>(null);
+
   // Modal gerar link manual
   const [modalLink,   setModalLink]   = useState(false);
-  const [dataLink,    setDataLink]    = useState('');
   const [linkGerado,  setLinkGerado]  = useState('');
   const [gerandoLink, setGerandoLink] = useState(false);
+
+  // Novo: múltiplas datas no link + destinatário
+  const [datasLink,         setDatasLink]         = useState<string[]>(['']);
+  const [destinatarioTipo,  setDestinatarioTipo]  = useState<'externo' | 'interno'>('externo');
+  const [destinatarioNome,  setDestinatarioNome]  = useState('');
+  const [destinatarioTel,   setDestinatarioTel]   = useState('');
+  const [linkGeradoWpp,     setLinkGeradoWpp]     = useState(false);
 
   const carregar = async () => {
     setLoading(true);
@@ -147,6 +159,8 @@ const ReservasAdminPage: React.FC = () => {
     setFormaPagamento('PIX');
     setTransacaoId('');
     setPdfGerado(false);
+    setComprovanteFile(null);
+    setComprovantePreview(null);
   };
 
   const handleConfirmar = async () => {
@@ -187,20 +201,93 @@ const ReservasAdminPage: React.FC = () => {
 
   // ── Link manual ───────────────────────────────────────────────────────────
 
+  // ── Comprovante upload ────────────────────────────────────────────────────
+
+  const handleComprovanteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setComprovanteFile(file);
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = ev => setComprovantePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setComprovantePreview(null); // PDF — mostra ícone
+    }
+  };
+
+  const removerComprovante = () => {
+    setComprovanteFile(null);
+    setComprovantePreview(null);
+    if (comprovanteInputRef.current) comprovanteInputRef.current.value = '';
+  };
+
+  // ── Link manual (multi-data) ──────────────────────────────────────────────
+
+  const addDataLink = () => setDatasLink(prev => [...prev, '']);
+  const removeDataLink = (i: number) => setDatasLink(prev => prev.filter((_, idx) => idx !== i));
+  const updateDataLink = (i: number, val: string) => {
+    setDatasLink(prev => prev.map((d, idx) => idx === i ? val : d));
+    setLinkGerado('');
+  };
+
+  const calcDatasLinkInfo = () => {
+    if (!config) return null;
+    const validas = datasLink.filter(Boolean);
+    if (!validas.length) return null;
+    return validas.map(d => {
+      const tipo  = calcularTipoDiaria(d);
+      const valor = calcularValor(tipo, config);
+      return { dateStr: d, tipo, valor };
+    });
+  };
+
   const handleGerarLink = async () => {
-    if (!dataLink || !config) return;
+    const validas = datasLink.filter(Boolean);
+    if (!validas.length || !config) return;
     setGerandoLink(true);
     try {
-      const tipo = calcularTipoDiaria(dataLink);
+      const dias = validas.map(d => ({
+        dateStr: d,
+        tipoDiaria: calcularTipoDiaria(d),
+        valor:      calcularValor(calcularTipoDiaria(d), config)
+      }));
+      const nomeCliente = destinatarioTipo === 'interno' && destinatarioNome
+        ? destinatarioNome
+        : 'A definir';
       const r = await criarReservaRascunho(
-        [{ dateStr: dataLink, tipoDiaria: tipo, valor: calcularValor(tipo, config) }],
+        dias,
         config,
-        { nome: 'A definir', cpfCnpj: '', telefone: '', email: '', tipoEvento: '', numConvidados: 0 }
+        { nome: nomeCliente, cpfCnpj: '', telefone: destinatarioTel || '', email: '', tipoEvento: '', numConvidados: 0 }
       );
-      setLinkGerado(`${window.location.origin}/#/reserva/${r.token}`);
+      const url = `${window.location.origin}/#/reserva/${r.token}`;
+      setLinkGerado(url);
+      setLinkGeradoWpp(false);
       carregar();
     } catch (e: any) { alert(e.message); }
     finally { setGerandoLink(false); }
+  };
+
+  const enviarLinkWpp = () => {
+    if (!linkGerado) return;
+    const nome  = destinatarioNome || 'cliente';
+    const info  = calcDatasLinkInfo();
+    const datas = info ? info.map(d => `• ${fmtDateLong(d.dateStr)}`).join('\n') : '';
+    const total = info ? info.reduce((s, d) => s + d.valor, 0) : 0;
+    const msg =
+      `Olá${destinatarioNome ? ', ' + destinatarioNome : ''}! 👋\n\n` +
+      `Segue o link do seu orçamento no *${config?.salonNome || 'Latitude22'}*:\n\n` +
+      (datas ? `📅 *Data(s) disponível(is):*\n${datas}\n\n` : '') +
+      (total ? `💰 *Valor estimado: ${fmt(total)}*\n\n` : '') +
+      `🔗 Acesse para confirmar os dados e finalizar sua reserva:\n${linkGerado}`;
+    const tel = destinatarioTel.replace(/\D/g, '');
+    if (tel) {
+      window.open(`https://wa.me/55${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+    } else {
+      navigator.clipboard.writeText(msg);
+      alert('Telefone não informado — mensagem copiada para a área de transferência!');
+    }
+    setLinkGeradoWpp(true);
   };
 
   // ── Filtro ────────────────────────────────────────────────────────────────
@@ -241,7 +328,7 @@ const ReservasAdminPage: React.FC = () => {
             className="p-2.5 rounded-lg border border-white/10 text-stone-400 hover:text-white transition-all">
             <RefreshCw size={16}/>
           </button>
-          <button onClick={() => { setModalLink(true); setLinkGerado(''); setDataLink(''); }}
+          <button onClick={() => { setModalLink(true); setLinkGerado(''); setDatasLink(['']); setDestinatarioNome(''); setDestinatarioTel(''); setDestinatarioTipo('externo'); setLinkGeradoWpp(false); }}
             className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-600/10 border border-amber-600/20 text-amber-500 text-xs font-bold uppercase tracking-widest hover:bg-amber-600/20 transition-all">
             <Link2 size={14}/>Gerar Link Manual
           </button>
@@ -614,6 +701,66 @@ const ReservasAdminPage: React.FC = () => {
                   className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
                   placeholder="Código do comprovante PIX..."/>
               </div>
+
+              {/* Upload do comprovante (imagem ou PDF) */}
+              <div>
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Arquivo do Comprovante (opcional)</label>
+                <input
+                  ref={comprovanteInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={handleComprovanteChange}
+                />
+                {!comprovanteFile ? (
+                  <button
+                    type="button"
+                    onClick={() => comprovanteInputRef.current?.click()}
+                    className="mt-1.5 w-full rounded-lg border border-dashed border-white/20 bg-stone-900/50 px-4 py-4 text-sm text-stone-500 hover:border-amber-500/40 hover:text-stone-300 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Paperclip size={14}/>
+                    Anexar foto ou PDF do comprovante
+                  </button>
+                ) : (
+                  <div className="mt-1.5 rounded-lg border border-white/10 bg-stone-900 p-3 flex items-start gap-3">
+                    {comprovantePreview ? (
+                      <img src={comprovantePreview} alt="comprovante"
+                        className="h-16 w-16 rounded-lg object-cover border border-white/10 flex-shrink-0 cursor-pointer"
+                        onClick={() => window.open(comprovantePreview!, '_blank')}
+                      />
+                    ) : (
+                      <div className="h-16 w-16 rounded-lg bg-stone-800 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <FileText size={22} className="text-amber-500"/>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white font-bold truncate">{comprovanteFile.name}</p>
+                      <p className="text-[10px] text-stone-500 mt-0.5">{(comprovanteFile.size / 1024).toFixed(0)} KB · {comprovanteFile.type.startsWith('image/') ? 'Imagem' : 'PDF'}</p>
+                      <div className="flex gap-3 mt-2">
+                        {comprovantePreview && (
+                          <button onClick={() => window.open(comprovantePreview!, '_blank')}
+                            className="text-[10px] text-amber-500 hover:text-amber-400 flex items-center gap-1">
+                            <ExternalLink size={10}/>Ver
+                          </button>
+                        )}
+                        <button onClick={() => comprovanteInputRef.current?.click()}
+                          className="text-[10px] text-stone-400 hover:text-white flex items-center gap-1">
+                          <Image size={10}/>Trocar
+                        </button>
+                        <button onClick={removerComprovante}
+                          className="text-[10px] text-red-500 hover:text-red-400 flex items-center gap-1">
+                          <X size={10}/>Remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {comprovanteFile && (
+                  <p className="text-[10px] text-stone-600 mt-1">
+                    ⚠️ O arquivo fica salvo localmente. Para armazenar na nuvem, integre ao Firebase Storage.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Confirmação de sucesso + ações pós-confirmação */}
@@ -657,53 +804,167 @@ const ReservasAdminPage: React.FC = () => {
         </div>
       )}
 
-      {/* ══ MODAL — GERAR LINK MANUAL ═════════════════════════════════════════ */}
+      {/* ══ MODAL — GERAR LINK DE ORÇAMENTO ══════════════════════════════════ */}
       {modalLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="glass rounded-2xl p-6 w-full max-w-md space-y-5">
-            <h3 className="font-bold text-white text-lg">Gerar Link Manual</h3>
-            <p className="text-xs text-stone-400">Gere um link para enviar ao cliente. Ele preenche os dados e escolhe a forma de pagamento.</p>
+          <div className="glass rounded-2xl p-6 w-full max-w-lg space-y-5 max-h-[92vh] overflow-y-auto">
 
-            <div>
-              <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Data do Evento *</label>
-              <input type="date" value={dataLink} min={new Date().toISOString().split('T')[0]}
-                onChange={e => { setDataLink(e.target.value); setLinkGerado(''); }}
-                className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-4 py-3 text-sm text-white focus:border-amber-500/50 focus:outline-none"/>
+            {/* Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-white text-lg">Gerar Link de Orçamento</h3>
+                <p className="text-xs text-stone-400 mt-1">Adicione uma ou mais datas e defina o destinatário para enviar o orçamento.</p>
+              </div>
+              <button onClick={() => { setModalLink(false); setLinkGerado(''); setDatasLink(['']); }}
+                className="p-1.5 rounded-lg text-stone-500 hover:text-white hover:bg-white/5 transition-all">
+                <X size={16}/>
+              </button>
             </div>
 
-            {dataLink && config && (() => {
-              const tipo    = calcularTipoDiaria(dataLink);
-              const total   = calcularValor(tipo, config);
-              const reserva = Math.ceil(total * config.percentualReserva / 100);
-              const label: Record<string, string> = { util:'Dia Útil', sabado:'Sábado', domingo:'Domingo', fimdesemana:'Fim de Semana' };
-              return (
-                <div className="bg-stone-900 rounded-lg p-4 text-sm space-y-1.5">
-                  <div className="flex justify-between"><span className="text-stone-500">Tipo</span><span className="text-white font-bold">{label[tipo]}</span></div>
-                  <div className="flex justify-between"><span className="text-stone-500">Total</span><span className="text-amber-500 font-bold">{fmt(total)}</span></div>
-                  <div className="flex justify-between"><span className="text-stone-500">Reserva ({config.percentualReserva}%)</span><span className="text-stone-300">{fmt(reserva)}</span></div>
-                </div>
-              );
-            })()}
+            {/* Tipo de destinatário */}
+            <div>
+              <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold mb-2 block">Destinatário</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { val: 'externo', label: 'Cliente Externo', icon: Globe, desc: 'Pessoa de fora' },
+                  { val: 'interno', label: 'Contato Interno', icon: UserCheck, desc: 'Equipe / parceiro' }
+                ] as const).map(({ val, label, icon: Icon, desc }) => (
+                  <button key={val} onClick={() => setDestinatarioTipo(val)}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                      destinatarioTipo === val
+                        ? 'border-amber-600/50 bg-amber-600/10 text-white'
+                        : 'border-white/10 bg-stone-900/50 text-stone-400 hover:border-white/20'
+                    }`}>
+                    <Icon size={16} className={destinatarioTipo === val ? 'text-amber-500' : 'text-stone-600'}/>
+                    <div>
+                      <p className="text-xs font-bold">{label}</p>
+                      <p className="text-[10px] text-stone-500">{desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
+            {/* Dados do destinatário */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">
+                  {destinatarioTipo === 'interno' ? 'Nome (interno)' : 'Nome do cliente'}
+                </label>
+                <input
+                  type="text"
+                  value={destinatarioNome}
+                  onChange={e => setDestinatarioNome(e.target.value)}
+                  placeholder={destinatarioTipo === 'interno' ? 'Ex: João da equipe' : 'Ex: Maria Silva'}
+                  className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">WhatsApp</label>
+                <input
+                  type="tel"
+                  value={destinatarioTel}
+                  onChange={e => setDestinatarioTel(e.target.value)}
+                  placeholder="(21) 99999-9999"
+                  className="mt-1.5 w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-amber-500/50 focus:outline-none placeholder:text-stone-600"
+                />
+              </div>
+            </div>
+
+            {/* Datas */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Data(s) do Evento</label>
+                <button onClick={addDataLink}
+                  className="flex items-center gap-1 text-[10px] text-amber-500 hover:text-amber-400 font-bold uppercase tracking-widest transition-colors">
+                  <Plus size={12}/>Adicionar data
+                </button>
+              </div>
+              <div className="space-y-2">
+                {datasLink.map((d, i) => {
+                  const info = d && config ? (() => {
+                    const tipo  = calcularTipoDiaria(d);
+                    const valor = calcularValor(tipo, config);
+                    const label: Record<string, string> = { util:'Dia Útil', sabado:'Sábado', domingo:'Domingo', fimdesemana:'Fim de Semana' };
+                    return { tipo: label[tipo], valor };
+                  })() : null;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={d}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={e => updateDataLink(i, e.target.value)}
+                        className="flex-1 rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-amber-500/50 focus:outline-none"
+                      />
+                      {info && (
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-[10px] text-stone-500">{info.tipo}</p>
+                          <p className="text-xs font-bold text-amber-500">{fmt(info.valor)}</p>
+                        </div>
+                      )}
+                      {datasLink.length > 1 && (
+                        <button onClick={() => removeDataLink(i)}
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-900/20 transition-all flex-shrink-0">
+                          <Trash2 size={13}/>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Resumo total */}
+              {(() => {
+                const infos = calcDatasLinkInfo();
+                if (!infos || infos.length < 2) return null;
+                const total = infos.reduce((s, d) => s + d.valor, 0);
+                return (
+                  <div className="mt-3 flex justify-between items-center bg-stone-900 rounded-lg px-4 py-2.5 border border-white/5">
+                    <span className="text-xs text-stone-400">{infos.length} data{infos.length > 1 ? 's' : ''} · Total estimado</span>
+                    <span className="text-sm font-bold text-amber-500">{fmt(total)}</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Link gerado */}
             {linkGerado ? (
-              <div className="bg-stone-900 rounded-lg p-4 border border-amber-600/20">
-                <p className="text-[9px] text-stone-500 uppercase tracking-widest mb-2">Link gerado</p>
-                <p className="text-xs text-stone-300 break-all mb-3">{linkGerado}</p>
-                <button onClick={() => { navigator.clipboard.writeText(linkGerado); setCopied('modal'); setTimeout(()=>setCopied(''),2000); }}
-                  className="flex items-center gap-1.5 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                  <Copy size={13}/>{copied === 'modal' ? 'Copiado!' : 'Copiar link'}
+              <div className="bg-stone-900 rounded-xl p-4 border border-amber-600/20 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={15} className="text-green-500 flex-shrink-0"/>
+                  <p className="text-xs font-bold text-green-400">Link criado com sucesso!</p>
+                </div>
+                <p className="text-[11px] text-stone-400 break-all font-mono bg-stone-800 rounded-lg p-2.5 border border-white/5">{linkGerado}</p>
+                <div className="flex gap-2">
+                  <button onClick={() => { navigator.clipboard.writeText(linkGerado); setCopied('modal'); setTimeout(()=>setCopied(''),2000); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-white/10 text-stone-400 hover:text-amber-500 hover:border-amber-600/30 text-xs font-bold uppercase tracking-widest transition-all">
+                    <Copy size={12}/>{copied === 'modal' ? '✓ Copiado!' : 'Copiar link'}
+                  </button>
+                  <button onClick={enviarLinkWpp}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${
+                      linkGeradoWpp
+                        ? 'bg-green-900/20 border border-green-800/30 text-green-400'
+                        : 'bg-green-600 hover:bg-green-500 text-white'
+                    }`}>
+                    <MessageCircle size={12}/>{linkGeradoWpp ? '✓ Enviado!' : (destinatarioTel ? 'Enviar no WhatsApp' : 'Copiar msg')}
+                  </button>
+                </div>
+                <button onClick={() => { setLinkGerado(''); setDatasLink(['']); setDestinatarioNome(''); setDestinatarioTel(''); setLinkGeradoWpp(false); }}
+                  className="w-full text-[10px] text-stone-600 hover:text-stone-400 transition-colors text-center uppercase tracking-widest">
+                  Gerar outro link
                 </button>
               </div>
             ) : (
-              <button onClick={handleGerarLink} disabled={gerandoLink || !dataLink}
+              <button onClick={handleGerarLink} disabled={gerandoLink || !datasLink.some(Boolean)}
                 className="w-full py-3.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2">
                 {gerandoLink
                   ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>Gerando...</>
-                  : <><Link2 size={14}/>Gerar Link</>}
+                  : <><Link2 size={14}/>Gerar Link de Orçamento</>}
               </button>
             )}
 
-            <button onClick={() => { setModalLink(false); setLinkGerado(''); setDataLink(''); }}
+            <button onClick={() => { setModalLink(false); setLinkGerado(''); setDatasLink(['']); }}
               className="w-full py-3 rounded-lg border border-white/10 text-stone-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-all">
               Fechar
             </button>
