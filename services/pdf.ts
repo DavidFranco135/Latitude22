@@ -1,6 +1,3 @@
-// services/pdf.ts
-// Depende de: jspdf e jspdf-autotable (já no package.json)
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Reserva, ReservaConfig, ReservaStatus } from '../types';
@@ -17,25 +14,25 @@ const fmtData = (str: string) => {
 const statusLabel = (s: ReservaStatus): string =>
   ({
     [ReservaStatus.PENDENTE_PAGAMENTO]: 'Pendente de Pagamento',
-    [ReservaStatus.RESERVADO]:          'Reservado (30% pago)',
-    [ReservaStatus.CONFIRMADO]:         'Confirmado (100% pago)',
-    [ReservaStatus.CANCELADO]:          'Cancelado',
-    [ReservaStatus.EXPIRADO]:           'Expirado'
+    [ReservaStatus.RESERVADO]: 'Reservado (30% pago)',
+    [ReservaStatus.CONFIRMADO]: 'Confirmado (100% pago)',
+    [ReservaStatus.CANCELADO]: 'Cancelado',
+    [ReservaStatus.EXPIRADO]: 'Expirado'
   }[s] || s);
 
 const tipoLabel = (t: string): string =>
   ({ util: 'Dia Útil', sabado: 'Sábado', domingo: 'Domingo', fimdesemana: 'Fim de Semana' }[t] || t);
 
 export const gerarComprovantePDF = (reserva: Reserva, config: ReservaConfig): void => {
-  const pdf    = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W      = pdf.internal.pageSize.getWidth();
-  const pageH  = pdf.internal.pageSize.getHeight();
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
 
   // ── CABEÇALHO ──────────────────────────────────────────────────────────────
-  pdf.setFillColor(12, 10, 9); // stone-950
+  pdf.setFillColor(12, 10, 9);
   pdf.rect(0, 0, W, 42, 'F');
 
-  pdf.setTextColor(217, 119, 6); // amber-600
+  pdf.setTextColor(217, 119, 6);
   pdf.setFontSize(22);
   pdf.setFont('helvetica', 'bold');
   pdf.text(config.salonNome || 'Salão Latitude22', W / 2, 18, { align: 'center' });
@@ -77,12 +74,12 @@ export const gerarComprovantePDF = (reserva: Reserva, config: ReservaConfig): vo
     bodyStyles: { fontSize: 9 },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
     body: [
-      ['Nome',              reserva.clienteNome],
-      ['CPF / CNPJ',        reserva.clienteCpfCnpj],
-      ['Telefone',          reserva.clienteTelefone],
-      ['E-mail',            reserva.clienteEmail],
-      ['Tipo de Evento',    reserva.tipoEvento],
-      ['Nº de Convidados',  String(reserva.numConvidados)]
+      ['Nome', reserva.clienteNome],
+      ['CPF / CNPJ', reserva.clienteCpfCnpj],
+      ['Telefone', reserva.clienteTelefone],
+      ['E-mail', reserva.clienteEmail],
+      ['Tipo de Evento', reserva.tipoEvento],
+      ['Nº de Convidados', String(reserva.numConvidados)]
     ]
   });
 
@@ -101,20 +98,21 @@ export const gerarComprovantePDF = (reserva: Reserva, config: ReservaConfig): vo
     bodyStyles: { fontSize: 9 },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
     body: [
-      ['Data do Evento',       fmtData(reserva.data)],
-      ['Tipo de Diária',       tipoLabel(reserva.tipoDiaria)],
-      ['Valor Total',          fmt(reserva.valorTotal)],
-      ['Valor Pago',           fmt(reserva.valorPago || 0)],
-      ['Valor Restante',       fmt(Math.max(0, reserva.valorTotal - (reserva.valorPago || 0)))],
-      ['Forma de Pagamento',   reserva.formaPagamento || '–'],
-      ['Data do Pagamento',
+      ['Data do Evento', fmtData(reserva.data)],
+      ['Tipo de Diária', tipoLabel(reserva.tipoDiaria)],
+      ['Valor Total', fmt(reserva.valorTotal)],
+      ['Valor Pago', fmt(reserva.valorPago || 0)],
+      ['Valor Restante', fmt(Math.max(0, reserva.valorTotal - (reserva.valorPago || 0)))],
+      ['Forma de Pagamento', reserva.formaPagamento || '–'],
+      [
+        'Data do Pagamento',
         reserva.dataPagamento
           ? (reserva.dataPagamento.toDate
               ? reserva.dataPagamento.toDate().toLocaleDateString('pt-BR')
               : new Date(reserva.dataPagamento).toLocaleDateString('pt-BR'))
           : '–'
       ],
-      ['Nº da Transação',      reserva.transacaoId || '–']
+      ['Nº da Transação', reserva.transacaoId || '–']
     ]
   });
 
@@ -133,10 +131,10 @@ export const gerarComprovantePDF = (reserva: Reserva, config: ReservaConfig): vo
     bodyStyles: { fontSize: 9 },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
     body: [
-      ['Estabelecimento', config.salonNome    || 'Salão Latitude22'],
-      ['CNPJ',            config.salonCnpj    || '–'],
-      ['Contato',         config.salonContato || '–'],
-      ['Chave PIX',       config.pixChave     || '–']
+      ['Estabelecimento', config.salonNome || 'Salão Latitude22'],
+      ['CNPJ', config.salonCnpj || '–'],
+      ['Contato', config.salonContato || '–'],
+      ['Chave PIX', config.pixChave || '–']
     ]
   });
 
