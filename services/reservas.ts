@@ -258,8 +258,10 @@ export const criarReservaRascunho = async (
 
 // ─── CONFIRMAR PAGAMENTO (admin) ──────────────────────────────────────────────
 //
-// Quando o admin clica "Marcar como Pago" → status vira RESERVADO ou CONFIRMADO
-// → a data é bloqueada automaticamente no getDatasOcupadas()
+// Registra o pagamento, muda o status, e lança no financeiro:
+//   • 1 entrada = valorPago
+//   • Se pagamento parcial (reserva/sinal): registra o saldo restante
+//     como "a receber" no documento da própria reserva (campo saldoPendente)
 
 export const confirmarPagamento = async (
   reservaId: string,
@@ -271,40 +273,115 @@ export const confirmarPagamento = async (
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error('Reserva não encontrada.');
 
-  const reserva   = snap.data() as Reserva;
-  const isPago100 = valorPago >= reserva.valorTotal;
-  const protocolo = (reserva as any).protocolo || gerarProtocolo();
+  const reserva    = snap.data() as Reserva;
+  const isPago100  = valorPago >= reserva.valorTotal;
+  const protocolo  = (reserva as any).protocolo || gerarProtocolo();
+  const saldo      = Math.max(0, reserva.valorTotal - valorPago);
+  const datas      = Array.isArray((reserva as any).datas) ? (reserva as any).datas : [reserva.data];
+  const dataLabel  = datas.map((d: string) => { const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }).join(', ');
 
-  // AQUI a data é bloqueada: status → RESERVADO ou CONFIRMADO
   await updateDoc(ref, {
-    status:        isPago100 ? ReservaStatus.CONFIRMADO : ReservaStatus.RESERVADO,
+    status:         isPago100 ? ReservaStatus.CONFIRMADO : ReservaStatus.RESERVADO,
     valorPago,
+    saldoPendente:  saldo,
     formaPagamento,
-    transacaoId:   transacaoId || '',
+    transacaoId:    transacaoId || '',
     protocolo,
-    dataPagamento: serverTimestamp()
+    dataPagamento:  serverTimestamp()
   });
 
-  // Registra no financeiro
+  // ── Lançamento de ENTRADA no financeiro ──────────────────────────────────
   await addDoc(collection(db, 'financial'), {
     type:        'income',
     amount:      valorPago,
-    description: `Reserva ${protocolo} — ${reserva.clienteNome}`,
-    date:        new Date().toISOString(),
+    description: `Reserva ${protocolo} — ${reserva.clienteNome} (${dataLabel})`,
+    date:        new Date().toISOString().split('T')[0],
+    category:    isPago100 ? 'Reserva — Pagamento Total' : 'Reserva — Sinal/Entrada',
     reservaId,
+    protocolo,
     createdAt:   serverTimestamp()
   });
 
   return protocolo;
 };
 
-// Cancela → status CANCELADO → data volta a ficar disponível no calendário automaticamente
-export const cancelarReserva = async (reservaId: string): Promise<void> => {
-  await updateDoc(doc(db, 'reservas', reservaId), { status: ReservaStatus.CANCELADO });
+// ─── ESTORNAR LANÇAMENTOS DA RESERVA ─────────────────────────────────────────
+//
+// Busca e deleta todos os lançamentos em `financial` vinculados à reserva,
+// e se havia pagamento real (valorPago > 0), registra um lançamento de ESTORNO
+// para manter o histórico auditável.
+
+const estornarFinanceiro = async (reserva: Reserva): Promise<void> => {
+  const reservaId = reserva.id;
+
+  // Busca todos os lançamentos com este reservaId
+  const qFinancial = query(
+    collection(db, 'financial'),
+    where('reservaId', '==', reservaId)
+  );
+  const snapFinancial = await getDocs(qFinancial);
+
+  // Soma o total que havia sido lançado como receita
+  let totalEstornado = 0;
+  for (const d of snapFinancial.docs) {
+    const t = d.data();
+    if (t.type === 'income' && t.amount > 0) totalEstornado += Number(t.amount);
+    await deleteDoc(d.ref);   // remove o lançamento original
+  }
+
+  // Se houve dinheiro recebido, registra estorno para histórico
+  if (totalEstornado > 0) {
+    const protocolo = (reserva as any).protocolo || reservaId;
+    const datas     = Array.isArray((reserva as any).datas) ? (reserva as any).datas : [reserva.data];
+    const dataLabel = datas.map((d: string) => { const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }).join(', ');
+
+    await addDoc(collection(db, 'financial'), {
+      type:        'expense',
+      amount:      totalEstornado,
+      description: `Estorno — Reserva ${protocolo} — ${reserva.clienteNome} (${dataLabel})`,
+      date:        new Date().toISOString().split('T')[0],
+      category:    'Estorno de Reserva',
+      reservaId,
+      protocolo,
+      estorno:     true,
+      createdAt:   serverTimestamp()
+    });
+  }
 };
 
-// Apaga permanentemente → data também volta a ficar disponível
+// Cancela → status CANCELADO → data volta ao calendário + estorna financeiro
+export const cancelarReserva = async (reservaId: string): Promise<void> => {
+  const snap = await getDoc(doc(db, 'reservas', reservaId));
+  if (!snap.exists()) return;
+
+  const reserva = { id: reservaId, ...snap.data() } as Reserva;
+
+  // Só estorna se já havia pagamento registrado
+  if (reserva.valorPago && reserva.valorPago > 0) {
+    await estornarFinanceiro(reserva);
+  }
+
+  await updateDoc(doc(db, 'reservas', reservaId), {
+    status:        ReservaStatus.CANCELADO,
+    saldoPendente: 0,
+    canceladoEm:   serverTimestamp()
+  });
+};
+
+// Apaga permanentemente → estorna financeiro + deleta reserva
 export const apagarReserva = async (reservaId: string): Promise<void> => {
+  const snap = await getDoc(doc(db, 'reservas', reservaId));
+  if (!snap.exists()) {
+    await deleteDoc(doc(db, 'reservas', reservaId));
+    return;
+  }
+
+  const reserva = { id: reservaId, ...snap.data() } as Reserva;
+
+  if (reserva.valorPago && reserva.valorPago > 0) {
+    await estornarFinanceiro(reserva);
+  }
+
   await deleteDoc(doc(db, 'reservas', reservaId));
 };
 
