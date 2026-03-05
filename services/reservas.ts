@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
   query, where, serverTimestamp, Timestamp, addDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -189,8 +189,14 @@ export const confirmarPagamento = async (
   return protocolo;
 };
 
+// Cancela → status CANCELADO → data volta a ficar disponível no calendário automaticamente
 export const cancelarReserva = async (reservaId: string): Promise<void> => {
   await updateDoc(doc(db, 'reservas', reservaId), { status: ReservaStatus.CANCELADO });
+};
+
+// Apaga permanentemente → data também volta a ficar disponível
+export const apagarReserva = async (reservaId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'reservas', reservaId));
 };
 
 // ─── BUSCAR ───────────────────────────────────────────────────────────────────
