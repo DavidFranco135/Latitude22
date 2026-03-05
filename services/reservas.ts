@@ -47,10 +47,10 @@ export const calcularTipoDiaria = (dateStr: string): TipoDiaria => {
 
 export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig): number => {
   switch (tipo) {
-    case 'sabado': return config.valorSabado;
-    case 'domingo': return config.valorDomingo;
-    case 'fimdesemana': return config.valorFimDeSemana;
-    default: return config.valorDiaUtil;
+    case 'sabado':     return config.valorSabado;
+    case 'domingo':    return config.valorDomingo;
+    case 'fimdesemana':return config.valorFimDeSemana;
+    default:           return config.valorDiaUtil;
   }
 };
 
@@ -70,32 +70,66 @@ export const gerarProtocolo = (): string => {
 
 // ─── DISPONIBILIDADE ─────────────────────────────────────────────────────────
 
+/**
+ * Verifica se uma data específica está disponível.
+ * Considera tanto o campo `data` (reservas de 1 dia) quanto o campo `datas[]`
+ * (reservas de múltiplos dias).
+ */
 export const verificarDisponibilidade = async (data: string): Promise<boolean> => {
-  const q = query(
+  const statusAtivos = [
+    ReservaStatus.PENDENTE_PAGAMENTO,
+    ReservaStatus.RESERVADO,
+    ReservaStatus.CONFIRMADO
+  ];
+
+  // Verifica campo `data` (compatibilidade retroativa)
+  const q1 = query(
     collection(db, 'reservas'),
     where('data', '==', data),
-    where('status', 'in', [
+    where('status', 'in', statusAtivos)
+  );
+  const snap1 = await getDocs(q1);
+  if (!snap1.empty) return false;
+
+  // Verifica campo `datas` (array de datas para reservas multi-dia)
+  const q2 = query(
+    collection(db, 'reservas'),
+    where('datas', 'array-contains', data),
+    where('status', 'in', statusAtivos)
+  );
+  const snap2 = await getDocs(q2);
+  return snap2.empty;
+};
+
+/**
+ * Retorna todas as datas ocupadas (campo `data` + campo `datas[]`).
+ */
+export const getDatasOcupadas = async (): Promise<string[]> => {
+  try {
+    const statusAtivos = [
       ReservaStatus.PENDENTE_PAGAMENTO,
       ReservaStatus.RESERVADO,
       ReservaStatus.CONFIRMADO
-    ])
-  );
-  const snap = await getDocs(q);
-  return snap.empty;
-};
+    ];
 
-export const getDatasOcupadas = async (): Promise<string[]> => {
-  try {
     const q = query(
       collection(db, 'reservas'),
-      where('status', 'in', [
-        ReservaStatus.PENDENTE_PAGAMENTO,
-        ReservaStatus.RESERVADO,
-        ReservaStatus.CONFIRMADO
-      ])
+      where('status', 'in', statusAtivos)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => d.data().data as string);
+
+    const datas = new Set<string>();
+    snap.docs.forEach(d => {
+      const r = d.data();
+      // Campo único (retrocompatibilidade)
+      if (r.data) datas.add(r.data as string);
+      // Campo array (multi-dia)
+      if (Array.isArray(r.datas)) {
+        (r.datas as string[]).forEach(dt => datas.add(dt));
+      }
+    });
+
+    return Array.from(datas);
   } catch (e) {
     console.warn('Erro ao buscar datas ocupadas:', e);
     return [];
@@ -104,28 +138,28 @@ export const getDatasOcupadas = async (): Promise<string[]> => {
 
 // ─── CRIAR RESERVA ───────────────────────────────────────────────────────────
 
+/**
+ * Cria uma reserva para uma única data.
+ * Mantida para compatibilidade e usada pelo ReservaPage para cada dia selecionado.
+ */
 export const criarReserva = async (
   data: string,
   tipoDiaria: TipoDiaria,
   config: ReservaConfig,
   cliente: {
-    nome: string;
-    cpfCnpj: string;
-    telefone: string;
-    email: string;
-    tipoEvento: string;
-    numConvidados: number;
+    nome: string; cpfCnpj: string; telefone: string;
+    email: string; tipoEvento: string; numConvidados: number;
   },
   criadoPorAdmin = false
 ): Promise<Reserva> => {
   const disponivel = await verificarDisponibilidade(data);
   if (!disponivel) {
-    throw new Error('Esta data não está disponível. Por favor, escolha outra.');
+    throw new Error(`A data ${data.split('-').reverse().join('/')} não está disponível. Por favor, escolha outra.`);
   }
 
-  const valorTotal = calcularValor(tipoDiaria, config);
+  const valorTotal   = calcularValor(tipoDiaria, config);
   const valorReserva = Math.ceil(valorTotal * config.percentualReserva / 100);
-  const token = gerarToken();
+  const token        = gerarToken();
 
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + config.expiracaoHoras);
@@ -133,7 +167,64 @@ export const criarReserva = async (
   const reservaData: Omit<Reserva, 'id'> = {
     token,
     data,
+    datas: [data],            // campo array para compatibilidade com getDatasOcupadas
     tipoDiaria,
+    valorTotal,
+    valorReserva,
+    percentualReserva: config.percentualReserva,
+    status: ReservaStatus.PENDENTE_PAGAMENTO,
+    clienteNome: cliente.nome,
+    clienteCpfCnpj: cliente.cpfCnpj,
+    clienteTelefone: cliente.telefone,
+    clienteEmail: cliente.email,
+    tipoEvento: cliente.tipoEvento,
+    numConvidados: cliente.numConvidados,
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(expiresAt),
+    criadoPorAdmin
+  } as any;
+
+  const ref = await addDoc(collection(db, 'reservas'), reservaData);
+  return { id: ref.id, ...reservaData } as Reserva;
+};
+
+/**
+ * Cria uma reserva para múltiplas datas em um único documento.
+ * As datas ficam bloqueadas no calendário via campo `datas[]`.
+ */
+export const criarReservaMultipla = async (
+  dias: Array<{ dateStr: string; tipoDiaria: TipoDiaria; valor: number }>,
+  config: ReservaConfig,
+  cliente: {
+    nome: string; cpfCnpj: string; telefone: string;
+    email: string; tipoEvento: string; numConvidados: number;
+  },
+  criadoPorAdmin = false
+): Promise<Reserva> => {
+  // Verifica disponibilidade de todos os dias primeiro
+  for (const dia of dias) {
+    const disponivel = await verificarDisponibilidade(dia.dateStr);
+    if (!disponivel) {
+      throw new Error(
+        `A data ${dia.dateStr.split('-').reverse().join('/')} não está disponível. Por favor, escolha outra.`
+      );
+    }
+  }
+
+  const valorTotal   = dias.reduce((s, d) => s + d.valor, 0);
+  const valorReserva = Math.ceil(valorTotal * config.percentualReserva / 100);
+  const token        = gerarToken();
+  const primeiroDia  = dias[0];
+
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + config.expiracaoHoras);
+
+  const reservaData = {
+    token,
+    data: primeiroDia.dateStr,           // campo legado — mantido para compatibilidade
+    datas: dias.map(d => d.dateStr),     // campo novo — array de todas as datas
+    diasDetalhes: dias,                  // detalhes por dia (tipo + valor)
+    tipoDiaria: primeiroDia.tipoDiaria,  // campo legado
     valorTotal,
     valorReserva,
     percentualReserva: config.percentualReserva,
@@ -150,7 +241,7 @@ export const criarReserva = async (
   };
 
   const ref = await addDoc(collection(db, 'reservas'), reservaData);
-  return { id: ref.id, ...reservaData } as Reserva;
+  return { id: ref.id, ...reservaData } as any as Reserva;
 };
 
 // ─── CONFIRMAR PAGAMENTO ─────────────────────────────────────────────────────
@@ -161,13 +252,13 @@ export const confirmarPagamento = async (
   formaPagamento: string,
   transacaoId?: string
 ): Promise<string> => {
-  const ref = doc(db, 'reservas', reservaId);
+  const ref  = doc(db, 'reservas', reservaId);
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error('Reserva não encontrada.');
 
-  const reserva = snap.data() as Reserva;
+  const reserva  = snap.data() as Reserva;
   const isPago100 = valorPago >= reserva.valorTotal;
-  const protocolo = reserva.protocolo || gerarProtocolo();
+  const protocolo = (reserva as any).protocolo || gerarProtocolo();
 
   await updateDoc(ref, {
     status: isPago100 ? ReservaStatus.CONFIRMADO : ReservaStatus.RESERVADO,
@@ -200,7 +291,7 @@ export const cancelarReserva = async (reservaId: string): Promise<void> => {
 
 export const getReservaPorToken = async (token: string): Promise<Reserva | null> => {
   try {
-    const q = query(collection(db, 'reservas'), where('token', '==', token));
+    const q    = query(collection(db, 'reservas'), where('token', '==', token));
     const snap = await getDocs(q);
     if (snap.empty) return null;
     const d = snap.docs[0];
