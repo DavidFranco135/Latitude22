@@ -198,31 +198,60 @@ const ReservaPage: React.FC = () => {
               const isSel     = diasSelecionados.some(d => d.dateStr === dateStr);
               const dow       = cellDate.getDay();
               const isSex     = dow === 5;
-              const isWE      = dow === 0 || dow === 6;  // Sáb ou Dom
+              const isWE      = dow === 0 || dow === 6;
               const isFer     = config ? isFeriado(dateStr, config) : false;
-              const feriado   = config ? getFeriado(dateStr, config) : null;
-
-              // Verifica se faz parte de pacote Sex+Sáb+Dom
+              const feriadoObj = config ? getFeriado(dateStr, config) : null;
               const isPartePacote = isSel && diasSelecionados.find(d => d.dateStr === dateStr)?.tipoDiaria === 'fimdesemana';
 
-              let cls = 'aspect-square rounded-lg text-[13px] font-semibold transition-all flex flex-col items-center justify-center relative ';
-              if (isPast)           cls += 'text-stone-800 cursor-not-allowed';
-              else if (isOcup)      cls += 'bg-red-900/20 text-red-700 cursor-not-allowed line-through text-[11px]';
-              else if (isSel && isPartePacote) cls += 'bg-purple-600 text-white ring-2 ring-purple-400 cursor-pointer scale-105';
-              else if (isSel)       cls += 'bg-amber-600 text-white ring-2 ring-amber-400 cursor-pointer scale-105';
-              else if (isFer)       cls += 'text-rose-400 bg-rose-900/20 hover:bg-rose-600/30 cursor-pointer border border-rose-800/30';
-              else if (isSex)       cls += 'text-violet-400 hover:bg-violet-600/20 cursor-pointer';
-              else if (isWE)        cls += 'text-amber-400 hover:bg-amber-600/20 cursor-pointer';
-              else                  cls += 'text-stone-300 hover:bg-stone-800 cursor-pointer hover:text-white';
+              let cls = 'aspect-square rounded-lg font-semibold transition-all flex flex-col items-center justify-center relative overflow-hidden ';
+              if (isPast)
+                cls += 'text-stone-800 cursor-not-allowed text-[13px]';
+              else if (isOcup)
+                cls += 'bg-red-900/20 text-red-700 cursor-not-allowed line-through text-[11px]';
+              else if (isSel && isFer)
+                cls += 'bg-rose-600 text-white ring-2 ring-rose-400 cursor-pointer scale-105 text-[13px]';
+              else if (isSel && isPartePacote)
+                cls += 'bg-purple-600 text-white ring-2 ring-purple-400 cursor-pointer scale-105 text-[13px]';
+              else if (isSel)
+                cls += 'bg-amber-600 text-white ring-2 ring-amber-400 cursor-pointer scale-105 text-[13px]';
+              else if (isFer)
+                cls += 'text-rose-300 bg-rose-900/30 hover:bg-rose-600/40 cursor-pointer border border-rose-700/50 text-[13px]';
+              else if (isSex)
+                cls += 'text-violet-400 hover:bg-violet-600/20 cursor-pointer text-[13px]';
+              else if (isWE)
+                cls += 'text-amber-400 hover:bg-amber-600/20 cursor-pointer text-[13px]';
+              else
+                cls += 'text-stone-300 hover:bg-stone-800 cursor-pointer hover:text-white text-[13px]';
 
               return (
-                <button key={i} disabled={isPast || isOcup} onClick={() => toggleData(dateStr)} className={cls} title={feriado ? feriado.nome : undefined}>
-                  {day}
+                <button
+                  key={i}
+                  disabled={isPast || isOcup}
+                  onClick={() => toggleData(dateStr)}
+                  className={cls}
+                  title={feriadoObj ? `${feriadoObj.nome}${feriadoObj.valor ? ' · R$ ' + feriadoObj.valor : ''}` : undefined}
+                >
+                  {/* Número do dia */}
+                  <span className="leading-none">{day}</span>
+
+                  {/* Estrela de feriado */}
                   {isFer && !isPast && !isOcup && (
-                    <Star size={6} className="absolute bottom-1 fill-rose-400 text-rose-400"/>
+                    <Star
+                      size={7}
+                      className={`absolute bottom-0.5 ${isSel ? 'fill-rose-200 text-rose-200' : 'fill-rose-400 text-rose-400'}`}
+                    />
                   )}
+
+                  {/* Label PKG (pacote fim de semana) */}
                   {isSel && isPartePacote && !isFer && (
-                    <span className="absolute bottom-0.5 text-[6px] text-purple-200 leading-none font-bold">PKG</span>
+                    <span className="absolute bottom-0.5 text-[5px] text-purple-200 leading-none font-bold tracking-widest">PKG</span>
+                  )}
+
+                  {/* Nome curto do feriado como micro-label (só quando não selecionado) */}
+                  {isFer && !isSel && !isPast && !isOcup && feriadoObj && (
+                    <span className="absolute top-0 left-0 right-0 text-[5px] text-rose-300/70 text-center leading-tight px-0.5 truncate font-bold">
+                      {feriadoObj.nome.split(' ')[0].toUpperCase()}
+                    </span>
                   )}
                 </button>
               );
