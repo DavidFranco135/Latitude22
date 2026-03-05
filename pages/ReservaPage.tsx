@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, AlertCircle, Loader, CheckCircle,
-  MessageCircle, FileText, Calendar, Trash2, Plus, Send
+  MessageCircle, FileText, Calendar, Trash2, Plus, Send, Star
 } from 'lucide-react';
 import {
-  getReservaConfig, calcularTipoDiaria, calcularValor,
+  getReservaConfig, calcularTipoDiaria, calcularValor, calcularDias,
+  isFeriado, getFeriado,
   getDatasOcupadas, getReservaPorToken, criarReservaRascunho
 } from '../services/reservas';
 import { gerarComprovantePDF } from '../services/pdf';
@@ -89,16 +90,22 @@ const ReservaPage: React.FC = () => {
     if (!config) return;
     setDiasSelecionados(prev => {
       const exists = prev.find(d => d.dateStr === dateStr);
-      if (exists) return prev.filter(d => d.dateStr !== dateStr);
-      const tipo  = calcularTipoDiaria(dateStr);
-      const valor = calcularValor(tipo, config);
-      return [...prev, { dateStr, tipoDiaria: tipo, valor }]
-        .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+      // Adiciona ou remove a data, mantendo ordenado
+      const novasDatas = exists
+        ? prev.filter(d => d.dateStr !== dateStr).map(d => d.dateStr)
+        : [...prev.map(d => d.dateStr), dateStr].sort();
+      // Recalcula todos os dias com a lógica de pacote (Sex+Sáb+Dom)
+      return calcularDias(novasDatas, config);
     });
   }, [config]);
 
-  const removerDia = (dateStr: string) =>
-    setDiasSelecionados(prev => prev.filter(d => d.dateStr !== dateStr));
+  const removerDia = (dateStr: string) => {
+    if (!config) return;
+    setDiasSelecionados(prev => {
+      const novasDatas = prev.filter(d => d.dateStr !== dateStr).map(d => d.dateStr);
+      return calcularDias(novasDatas, config);
+    });
+  };
 
   // Monta a mensagem do WhatsApp para o admin
   const montarMsgWhatsApp = (tipo: 'reserva' | 'total', reserva: Reserva) => {
@@ -184,51 +191,101 @@ const ReservaPage: React.FC = () => {
           <div className="grid grid-cols-7 gap-1">
             {cells.map((day, i) => {
               if (!day) return <div key={i} />;
-              const dateStr  = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-              const cellDate = new Date(dateStr + 'T12:00:00');
-              const isPast   = cellDate < today;
-              const isOcup   = datasOcupadas.includes(dateStr);
-              const isSel    = diasSelecionados.some(d => d.dateStr === dateStr);
-              const dow      = cellDate.getDay();
-              const isWE     = dow === 0 || dow === 6;
+              const dateStr   = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+              const cellDate  = new Date(dateStr + 'T12:00:00');
+              const isPast    = cellDate < today;
+              const isOcup    = datasOcupadas.includes(dateStr);
+              const isSel     = diasSelecionados.some(d => d.dateStr === dateStr);
+              const dow       = cellDate.getDay();
+              const isSex     = dow === 5;
+              const isWE      = dow === 0 || dow === 6;  // Sáb ou Dom
+              const isFer     = config ? isFeriado(dateStr, config) : false;
+              const feriado   = config ? getFeriado(dateStr, config) : null;
 
-              let cls = 'aspect-square rounded-lg text-[13px] font-semibold transition-all flex items-center justify-center ';
-              if (isPast)      cls += 'text-stone-800 cursor-not-allowed';
-              else if (isOcup) cls += 'bg-red-900/20 text-red-700 cursor-not-allowed line-through text-[11px]';
-              else if (isSel)  cls += 'bg-amber-600 text-white ring-2 ring-amber-400 cursor-pointer scale-105';
-              else if (isWE)   cls += 'text-amber-400 hover:bg-amber-600/20 cursor-pointer';
-              else             cls += 'text-stone-300 hover:bg-stone-800 cursor-pointer hover:text-white';
+              // Verifica se faz parte de pacote Sex+Sáb+Dom
+              const isPartePacote = isSel && diasSelecionados.find(d => d.dateStr === dateStr)?.tipoDiaria === 'fimdesemana';
+
+              let cls = 'aspect-square rounded-lg text-[13px] font-semibold transition-all flex flex-col items-center justify-center relative ';
+              if (isPast)           cls += 'text-stone-800 cursor-not-allowed';
+              else if (isOcup)      cls += 'bg-red-900/20 text-red-700 cursor-not-allowed line-through text-[11px]';
+              else if (isSel && isPartePacote) cls += 'bg-purple-600 text-white ring-2 ring-purple-400 cursor-pointer scale-105';
+              else if (isSel)       cls += 'bg-amber-600 text-white ring-2 ring-amber-400 cursor-pointer scale-105';
+              else if (isFer)       cls += 'text-rose-400 bg-rose-900/20 hover:bg-rose-600/30 cursor-pointer border border-rose-800/30';
+              else if (isSex)       cls += 'text-violet-400 hover:bg-violet-600/20 cursor-pointer';
+              else if (isWE)        cls += 'text-amber-400 hover:bg-amber-600/20 cursor-pointer';
+              else                  cls += 'text-stone-300 hover:bg-stone-800 cursor-pointer hover:text-white';
 
               return (
-                <button key={i} disabled={isPast || isOcup} onClick={() => toggleData(dateStr)} className={cls}>
+                <button key={i} disabled={isPast || isOcup} onClick={() => toggleData(dateStr)} className={cls} title={feriado ? feriado.nome : undefined}>
                   {day}
+                  {isFer && !isPast && !isOcup && (
+                    <Star size={6} className="absolute bottom-1 fill-rose-400 text-rose-400"/>
+                  )}
+                  {isSel && isPartePacote && !isFer && (
+                    <span className="absolute bottom-0.5 text-[6px] text-purple-200 leading-none font-bold">PKG</span>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-4 text-[10px] text-stone-500 pt-4 border-t border-white/5">
+          {/* Legenda */}
+          <div className="mt-5 flex flex-wrap gap-3 text-[10px] text-stone-500 pt-4 border-t border-white/5">
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-600 inline-block"/>Selecionado</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-900/40 inline-block"/>Ocupado</span>
-            <span className="flex items-center gap-1.5 text-amber-500"><span className="w-3 h-3 rounded bg-amber-600/20 inline-block"/>Fim de semana</span>
-            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-stone-800 inline-block"/>Disponível</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-purple-600 inline-block"/>Pacote Sex+Sáb+Dom</span>
+            <span className="flex items-center gap-1.5 text-rose-400"><span className="w-3 h-3 rounded bg-rose-900/30 border border-rose-800/40 inline-block"/>Feriado ★</span>
+            <span className="flex items-center gap-1.5 text-violet-400"><span className="w-3 h-3 rounded bg-violet-600/20 inline-block"/>Sexta-feira</span>
+            <span className="flex items-center gap-1.5 text-amber-500"><span className="w-3 h-3 rounded bg-amber-600/20 inline-block"/>Sáb / Dom</span>
+            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-red-900/30 inline-block"/>Ocupado</span>
           </div>
         </div>
 
         {/* Tabela de preços */}
         {config && (
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: 'Dia Útil',      val: config.valorDiaUtil },
-              { label: 'Sábado',        val: config.valorSabado },
-              { label: 'Domingo',       val: config.valorDomingo },
-              { label: 'Fim de Semana', val: config.valorFimDeSemana }
-            ].map(({ label, val }) => (
-              <div key={label} className="glass rounded-xl p-3 border border-white/5">
-                <p className="text-[9px] text-stone-500 uppercase tracking-widest">{label}</p>
-                <p className="text-sm font-bold text-amber-500 mt-0.5">{fmt(val)}</p>
-              </div>
-            ))}
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold text-stone-500 uppercase tracking-widest px-1">Tabela de preços</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Dia Útil',                 val: config.valorDiaUtil,       color: 'text-stone-300' },
+                { label: 'Sexta-feira',              val: config.valorSexta ?? config.valorDiaUtil, color: 'text-violet-400' },
+                { label: 'Sábado',                   val: config.valorSabado,        color: 'text-amber-500' },
+                { label: 'Domingo',                  val: config.valorDomingo,       color: 'text-amber-500' },
+                { label: 'Pacote Sex + Sáb + Dom',   val: config.valorFimDeSemana,   color: 'text-purple-400' },
+                { label: 'Feriado',                  val: config.valorFeriado,       color: 'text-rose-400' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="glass rounded-xl p-3 border border-white/5">
+                  <p className="text-[9px] text-stone-500 uppercase tracking-widest leading-tight">{label}</p>
+                  <p className={`text-sm font-bold mt-0.5 ${color}`}>{fmt(val)}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Feriados deste mês */}
+            {(() => {
+              const feriadosMes = (config.feriados || []).filter(f => {
+                const [fy, fm] = f.dateStr.split('-');
+                return Number(fy) === calYear && Number(fm) - 1 === calMonth;
+              });
+              if (!feriadosMes.length) return null;
+              return (
+                <div className="glass rounded-xl p-3 border border-rose-800/20">
+                  <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                    <Star size={10} className="fill-rose-400"/>Feriados em {MESES[calMonth]}
+                  </p>
+                  <div className="space-y-1">
+                    {feriadosMes.map(f => {
+                      const [, , dd] = f.dateStr.split('-');
+                      return (
+                        <div key={f.dateStr} className="flex justify-between text-xs">
+                          <span className="text-stone-400">dia {dd} · <span className="text-rose-300">{f.nome}</span></span>
+                          <span className="text-rose-400 font-bold">{fmt(f.valor ?? config.valorFeriado)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -238,16 +295,33 @@ const ReservaPage: React.FC = () => {
             <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-2">
               <Calendar size={14} />{diasSelecionados.length} data{diasSelecionados.length > 1 ? 's' : ''} selecionada{diasSelecionados.length > 1 ? 's' : ''}
             </p>
+
+            {/* Aviso de pacote ativo */}
+            {diasSelecionados.some(d => d.tipoDiaria === 'fimdesemana') && (
+              <div className="flex items-center gap-2 bg-purple-900/20 border border-purple-800/30 rounded-lg px-3 py-2">
+                <span className="text-purple-400 text-xs font-bold">🎉 Pacote Fim de Semana aplicado!</span>
+                <span className="text-stone-500 text-[10px]">Sex + Sáb + Dom com desconto</span>
+              </div>
+            )}
+
             {diasSelecionados.map(dia => {
-              const tipoLabel: Record<TipoDiaria, string> = { util:'Dia Útil', sabado:'Sábado', domingo:'Domingo', fimdesemana:'Fim de Semana' };
+              const tipoLabel: Record<TipoDiaria, string> = {
+                util:'Dia Útil', sabado:'Sábado', domingo:'Domingo',
+                fimdesemana:'Pacote Fim de Semana', sexta:'Sexta-feira', feriado:'Feriado'
+              };
+              const feriadoNome = dia.tipoDiaria === 'feriado' && config
+                ? getFeriado(dia.dateStr, config)?.nome : null;
               return (
                 <div key={dia.dateStr} className="flex items-center justify-between bg-stone-900 rounded-lg px-4 py-2.5 border border-white/5">
                   <div>
                     <p className="text-sm font-bold text-white">{fmtDate(dia.dateStr)}</p>
-                    <p className="text-[10px] text-stone-500">{tipoLabel[dia.tipoDiaria]}</p>
+                    <p className="text-[10px] text-stone-500">
+                      {tipoLabel[dia.tipoDiaria]}
+                      {feriadoNome && <span className="text-rose-400 ml-1">· {feriadoNome}</span>}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <p className="text-sm font-bold text-amber-500">{fmt(dia.valor)}</p>
+                    <p className={`text-sm font-bold ${dia.tipoDiaria === 'feriado' ? 'text-rose-400' : dia.tipoDiaria === 'fimdesemana' ? 'text-purple-400' : 'text-amber-500'}`}>{fmt(dia.valor)}</p>
                     <button onClick={() => removerDia(dia.dateStr)} className="text-stone-600 hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
