@@ -3,8 +3,7 @@ import {
   Save, Camera, Instagram, MessageCircle, Globe, Sparkles, Upload, 
   X, Users, MoreVertical, Shield, Trash2, Edit2, CheckCircle, Ban, Image, Loader2,
   Plus, ArrowUp, ArrowDown, ImageIcon, Video, Type, Mail,
-  // ADICIONADO: ícones para seção de reservas
-  BookOpen, ToggleLeft, ToggleRight
+  BookOpen, ToggleLeft, ToggleRight, Star, CalendarDays
 } from 'lucide-react';
 import { doc, getDoc, setDoc, collection, onSnapshot, addDoc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase';
@@ -91,6 +90,11 @@ const SettingsPage: React.FC = () => {
   // ADICIONADO: config de reservas
   const [reservaConfig, setReservaConfig] = useState<ReservaConfig | null>(null);
   const [savingReserva, setSavingReserva] = useState(false);
+
+  // Feriado form
+  const [novoFeriadoData,  setNovoFeriadoData]  = useState('');
+  const [novoFeriadoNome,  setNovoFeriadoNome]  = useState('');
+  const [novoFeriadoValor, setNovoFeriadoValor] = useState('');
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -1026,14 +1030,14 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          ADICIONADO: Configurações de Reservas Online
-          (tudo acima está idêntico ao original)
+          Configurações de Reservas Online
       ══════════════════════════════════════════════════════════════════ */}
       {reservaConfig && (
-        <div className="rounded-2xl border border-amber-600/20 bg-stone-900 p-8 shadow-2xl">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-stone-100 text-lg flex items-center">
-              <BookOpen size={20} className="mr-2 text-amber-500" />
+        <div className="rounded-2xl border border-amber-600/20 bg-stone-900 p-8 shadow-2xl space-y-8">
+          {/* Cabeçalho + toggle ativo */}
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-stone-100 text-lg flex items-center gap-2">
+              <BookOpen size={20} className="text-amber-500" />
               Configurações de Reservas Online
             </h3>
             <button
@@ -1047,49 +1051,175 @@ const SettingsPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { key: 'valorDiaUtil',      label: 'Valor Dia Útil (R$)' },
-              { key: 'valorSabado',       label: 'Valor Sábado (R$)' },
-              { key: 'valorDomingo',      label: 'Valor Domingo (R$)' },
-              { key: 'valorFimDeSemana',  label: 'Valor Fim de Semana (R$)' },
-              { key: 'percentualReserva', label: 'Percentual de Reserva (%)' },
-              { key: 'expiracaoHoras',    label: 'Expiração do Link (horas)' }
-            ].map(({ key, label }) => (
-              <div key={key}>
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
-                <input
-                  type="number"
-                  value={(reservaConfig as any)[key] ?? ''}
-                  onChange={e => setReservaConfig(c => c ? { ...c, [key]: Number(e.target.value) } : c)}
-                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
-                />
-              </div>
-            ))}
+          {/* ── Valores por tipo de dia ── */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-4">Valores por Tipo de Dia (R$)</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { key: 'valorDiaUtil',      label: 'Dia Útil',                   color: 'border-stone-700' },
+                { key: 'valorSexta',        label: 'Sexta-feira (isolada)',       color: 'border-violet-700/40' },
+                { key: 'valorSabado',       label: 'Sábado (isolado)',            color: 'border-amber-700/40' },
+                { key: 'valorDomingo',      label: 'Domingo (isolado)',           color: 'border-amber-700/40' },
+                { key: 'valorFimDeSemana',  label: 'Pacote Sex + Sáb + Dom 🎉',  color: 'border-purple-700/40' },
+                { key: 'valorFeriado',      label: 'Feriado (padrão) ★',         color: 'border-rose-700/40' },
+                { key: 'percentualReserva', label: 'Percentual de Reserva (%)',  color: 'border-stone-700' },
+                { key: 'expiracaoHoras',    label: 'Expiração do Link (horas)',  color: 'border-stone-700' },
+              ].map(({ key, label, color }) => (
+                <div key={key}>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
+                  <input
+                    type="number"
+                    value={(reservaConfig as any)[key] ?? ''}
+                    onChange={e => setReservaConfig(c => c ? { ...c, [key]: Number(e.target.value) } : c)}
+                    className={`w-full rounded-lg border ${color} bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none`}
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-stone-600 mt-3">
+              💡 O <strong className="text-stone-400">Pacote Fim de Semana</strong> é aplicado automaticamente quando o cliente seleciona Sexta + Sábado + Domingo consecutivos.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            {[
-              { key: 'whatsappLink',  label: 'Link do WhatsApp',   placeholder: 'https://wa.me/55219...' },
-              { key: 'pixChave',      label: 'Chave PIX',          placeholder: 'CPF, e-mail, telefone ou chave aleatória' },
-              { key: 'salonNome',     label: 'Nome do Salão (PDF)',  placeholder: 'Salão Latitude22' },
-              { key: 'salonCnpj',     label: 'CNPJ (PDF)',         placeholder: '00.000.000/0001-00' },
-              { key: 'salonContato',  label: 'Contato (PDF)',       placeholder: '(21) 99999-9999' }
-            ].map(({ key, label, placeholder }) => (
-              <div key={key}>
-                <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
-                <input
-                  type="text"
-                  value={(reservaConfig as any)[key] ?? ''}
-                  onChange={e => setReservaConfig(c => c ? { ...c, [key]: e.target.value } : c)}
-                  placeholder={placeholder}
-                  className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none placeholder:text-stone-600"
-                />
-              </div>
-            ))}
+          {/* ── Dados do estabelecimento ── */}
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-4">Dados do Estabelecimento / Pagamento</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[
+                { key: 'whatsappLink',  label: 'Link do WhatsApp',    placeholder: 'https://wa.me/55219...' },
+                { key: 'pixChave',      label: 'Chave PIX',           placeholder: 'CPF, e-mail, telefone ou chave aleatória' },
+                { key: 'salonNome',     label: 'Nome do Salão (PDF)', placeholder: 'Salão Latitude22' },
+                { key: 'salonCnpj',     label: 'CNPJ (PDF)',          placeholder: '00.000.000/0001-00' },
+                { key: 'salonContato',  label: 'Contato (PDF)',       placeholder: '(21) 99999-9999' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">{label}</label>
+                  <input
+                    type="text"
+                    value={(reservaConfig as any)[key] ?? ''}
+                    onChange={e => setReservaConfig(c => c ? { ...c, [key]: e.target.value } : c)}
+                    placeholder={placeholder}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none placeholder:text-stone-600"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="flex justify-end mt-6">
+          {/* ── Feriados ── */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Star size={16} className="text-rose-400 fill-rose-400"/>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500">Feriados com Valor Especial</p>
+            </div>
+
+            {/* Lista de feriados cadastrados */}
+            {(reservaConfig.feriados || []).length > 0 ? (
+              <div className="space-y-2 mb-4">
+                {[...(reservaConfig.feriados || [])].sort((a, b) => a.dateStr.localeCompare(b.dateStr)).map(f => {
+                  const [fy, fm, fd] = f.dateStr.split('-');
+                  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+                  return (
+                    <div key={f.dateStr} className="flex items-center justify-between bg-stone-950 rounded-lg px-4 py-3 border border-rose-800/20">
+                      <div className="flex items-center gap-3">
+                        <CalendarDays size={14} className="text-rose-400 flex-shrink-0"/>
+                        <div>
+                          <p className="text-sm font-bold text-white">{f.nome}</p>
+                          <p className="text-[10px] text-stone-500">{fd}/{fm}/{fy}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-rose-400 font-bold text-sm">
+                          {f.valor
+                            ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(f.valor)
+                            : <span className="text-stone-600 text-xs">usa padrão</span>}
+                        </span>
+                        <button
+                          onClick={() => setReservaConfig(c => c ? {
+                            ...c,
+                            feriados: (c.feriados || []).filter(x => x.dateStr !== f.dateStr)
+                          } : c)}
+                          className="p-1.5 rounded-lg text-stone-600 hover:text-red-400 hover:bg-red-900/10 transition-all">
+                          <Trash2 size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-6 rounded-lg border border-dashed border-white/10 mb-4">
+                <Star size={24} className="mx-auto text-stone-700 mb-2"/>
+                <p className="text-stone-600 text-xs">Nenhum feriado cadastrado. Adicione abaixo.</p>
+              </div>
+            )}
+
+            {/* Formulário para adicionar feriado */}
+            <div className="bg-stone-950 rounded-xl p-4 border border-rose-800/20 space-y-3">
+              <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Adicionar Feriado</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Data *</label>
+                  <input
+                    type="date"
+                    value={novoFeriadoData}
+                    onChange={e => setNovoFeriadoData(e.target.value)}
+                    className="w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-rose-500/50 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Nome do Feriado *</label>
+                  <input
+                    type="text"
+                    value={novoFeriadoNome}
+                    onChange={e => setNovoFeriadoNome(e.target.value)}
+                    placeholder="Ex: Natal, Carnaval, Aniversário RJ..."
+                    className="w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-rose-500/50 focus:outline-none placeholder:text-stone-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
+                    Valor Especial (R$) <span className="text-stone-600 normal-case font-normal">ou vazio = padrão</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={novoFeriadoValor}
+                    onChange={e => setNovoFeriadoValor(e.target.value)}
+                    placeholder={String(reservaConfig.valorFeriado || 2500)}
+                    className="w-full rounded-lg border border-white/10 bg-stone-900 px-3 py-2.5 text-sm text-white focus:border-rose-500/50 focus:outline-none placeholder:text-stone-600"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!novoFeriadoData || !novoFeriadoNome.trim()) return;
+                  const jaExiste = (reservaConfig.feriados || []).some(f => f.dateStr === novoFeriadoData);
+                  if (jaExiste) { alert('Já existe um feriado nesta data.'); return; }
+                  setReservaConfig(c => c ? {
+                    ...c,
+                    feriados: [
+                      ...(c.feriados || []),
+                      {
+                        dateStr: novoFeriadoData,
+                        nome:    novoFeriadoNome.trim(),
+                        valor:   novoFeriadoValor ? Number(novoFeriadoValor) : undefined
+                      }
+                    ]
+                  } : c);
+                  setNovoFeriadoData('');
+                  setNovoFeriadoNome('');
+                  setNovoFeriadoValor('');
+                }}
+                disabled={!novoFeriadoData || !novoFeriadoNome.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold uppercase tracking-widest transition-all disabled:opacity-40"
+              >
+                <Plus size={14}/>Adicionar Feriado
+              </button>
+            </div>
+          </div>
+
+          {/* Botão salvar */}
+          <div className="flex justify-end pt-2">
             <button
               onClick={handleSaveReservaConfig}
               disabled={savingReserva}
