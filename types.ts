@@ -88,14 +88,22 @@ export enum ReservaStatus {
   EXPIRADO = 'expirado'
 }
 
-export type TipoDiaria = 'util' | 'sabado' | 'domingo' | 'fimdesemana';
+export type TipoDiaria = 'util' | 'sabado' | 'domingo' | 'fimdesemana' | 'sexta' | 'feriado';
+
+export interface Feriado {
+  dateStr: string;   // 'YYYY-MM-DD'
+  nome: string;      // ex: 'Natal', 'Carnaval'
+  valor?: number;    // se null/undefined → usa valorFeriado global
+}
 
 export interface ReservaConfig {
   id?: string;
   valorDiaUtil: number;
   valorSabado: number;
   valorDomingo: number;
-  valorFimDeSemana: number;
+  valorFimDeSemana: number;  // Sexta + Sáb + Dom juntos
+  valorSexta: number;        // Sexta isolada
+  valorFeriado: number;      // Feriado avulso (padrão)
   percentualReserva: number;
   whatsappLink: string;
   reservaOnlineAtiva: boolean;
@@ -107,6 +115,7 @@ export interface ReservaConfig {
   salonCnpj?: string;
   salonContato?: string;
   pixChave?: string;
+  feriados?: Feriado[];      // lista de feriados cadastrados pelo admin
 }
 
 export interface Reserva {
