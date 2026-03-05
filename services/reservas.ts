@@ -14,11 +14,13 @@ export const getReservaConfig = async (): Promise<ReservaConfig> => {
   } catch (e) { console.warn('Erro ao buscar config:', e); }
   return {
     valorDiaUtil: 1500, valorSabado: 2500, valorDomingo: 2000,
-    valorFimDeSemana: 4000, percentualReserva: 30,
+    valorFimDeSemana: 4000, valorSexta: 2000, valorFeriado: 2500,
+    percentualReserva: 30,
     whatsappLink: 'https://wa.me/5521000000000',
     reservaOnlineAtiva: true, pagamentoAutomaticoAtivo: false,
     expiracaoHoras: 48, salonNome: 'Salão Latitude22',
-    salonCnpj: '', salonContato: '', pixChave: ''
+    salonCnpj: '', salonContato: '', pixChave: '',
+    feriados: []
   };
 };
 
@@ -27,21 +29,102 @@ export const saveReservaConfig = async (config: Partial<ReservaConfig>) => {
 };
 
 // ─── CÁLCULO ─────────────────────────────────────────────────────────────────
+//
+// REGRAS DE TIPO:
+//   • Feriado cadastrado                       → 'feriado'
+//   • Sexta + Sábado + Domingo (conjunto)      → aplica 'fimdesemana' no total (veja calcularDias)
+//   • Sexta isolada                            → 'sexta'
+//   • Sábado isolado                           → 'sabado'
+//   • Domingo isolado                          → 'domingo'
+//   • Qualquer outro dia                       → 'util'
 
-export const calcularTipoDiaria = (dateStr: string): TipoDiaria => {
+export const isFeriado = (dateStr: string, config: ReservaConfig): boolean =>
+  (config.feriados || []).some(f => f.dateStr === dateStr);
+
+export const getFeriado = (dateStr: string, config: ReservaConfig) =>
+  (config.feriados || []).find(f => f.dateStr === dateStr);
+
+export const calcularTipoDiaria = (dateStr: string, config?: ReservaConfig): TipoDiaria => {
+  if (config && isFeriado(dateStr, config)) return 'feriado';
   const dow = new Date(dateStr + 'T12:00:00').getDay();
+  if (dow === 5) return 'sexta';
   if (dow === 6) return 'sabado';
   if (dow === 0) return 'domingo';
   return 'util';
 };
 
-export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig): number => {
+export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig, dateStr?: string): number => {
+  if (tipo === 'feriado' && dateStr) {
+    const f = getFeriado(dateStr, config);
+    return (f?.valor ?? config.valorFeriado) || config.valorFeriado || 2500;
+  }
   switch (tipo) {
+    case 'sexta':       return config.valorSexta      ?? config.valorDiaUtil;
     case 'sabado':      return config.valorSabado;
     case 'domingo':     return config.valorDomingo;
     case 'fimdesemana': return config.valorFimDeSemana;
     default:            return config.valorDiaUtil;
   }
+};
+
+// ─── DETECÇÃO DE FIM DE SEMANA COMPLETO ──────────────────────────────────────
+//
+// Se o cliente selecionar Sexta + Sábado + Domingo consecutivos (ou qualquer
+// combinação que forme um pacote Sex+Sáb+Dom), aplica o valorFimDeSemana
+// no lugar de cobrar cada dia separado.
+
+export const calcularDias = (
+  datasStr: string[],
+  config: ReservaConfig
+): Array<{ dateStr: string; tipoDiaria: TipoDiaria; valor: number }> => {
+
+  // Primeiro calcula o tipo individual de cada data
+  const dias = datasStr.map(d => ({
+    dateStr:    d,
+    tipoDiaria: calcularTipoDiaria(d, config) as TipoDiaria,
+    valor:      0
+  }));
+
+  // Detecta pacotes Sex+Sáb+Dom consecutivos
+  const usados = new Set<string>();
+
+  for (let i = 0; i < dias.length - 2; i++) {
+    const a = dias[i], b = dias[i + 1], c = dias[i + 2];
+    if (usados.has(a.dateStr) || usados.has(b.dateStr) || usados.has(c.dateStr)) continue;
+
+    const dowA = new Date(a.dateStr + 'T12:00:00').getDay();
+    const dowB = new Date(b.dateStr + 'T12:00:00').getDay();
+    const dowC = new Date(c.dateStr + 'T12:00:00').getDay();
+
+    // Sex=5, Sáb=6, Dom=0 — e devem ser dias consecutivos
+    const isFimDeSemanaCompleto =
+      dowA === 5 && dowB === 6 && dowC === 0 &&
+      !isFeriado(a.dateStr, config) && !isFeriado(b.dateStr, config) && !isFeriado(c.dateStr, config);
+
+    if (isFimDeSemanaCompleto) {
+      // Distribui o valor do pacote entre os 3 dias (1/3 cada para o breakdown)
+      const valorPacote = config.valorFimDeSemana;
+      a.tipoDiaria = 'fimdesemana';
+      b.tipoDiaria = 'fimdesemana';
+      c.tipoDiaria = 'fimdesemana';
+      // Valor fracionado só para exibição; o total é correto
+      a.valor = Math.round(valorPacote / 3);
+      b.valor = Math.round(valorPacote / 3);
+      c.valor = valorPacote - 2 * Math.round(valorPacote / 3);
+      usados.add(a.dateStr);
+      usados.add(b.dateStr);
+      usados.add(c.dateStr);
+    }
+  }
+
+  // Dias que não fazem parte de pacote → valor individual
+  dias.forEach(d => {
+    if (!usados.has(d.dateStr)) {
+      d.valor = calcularValor(d.tipoDiaria, config, d.dateStr);
+    }
+  });
+
+  return dias;
 };
 
 // ─── TOKEN / PROTOCOLO ────────────────────────────────────────────────────────
