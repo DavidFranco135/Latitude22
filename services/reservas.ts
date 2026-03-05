@@ -3,29 +3,55 @@ import {
   query, where, serverTimestamp, Timestamp, addDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Reserva, ReservaConfig, ReservaStatus, TipoDiaria } from '../types';
+import { Reserva, ReservaConfig, ReservaStatus, TipoDiaria, Feriado } from '../types';
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
+
+const CONFIG_DEFAULT: ReservaConfig = {
+  valorDiaUtil: 1500, valorSabado: 2500, valorDomingo: 2000,
+  valorFimDeSemana: 4000, valorSexta: 2000, valorFeriado: 2500,
+  percentualReserva: 30,
+  whatsappLink: 'https://wa.me/5521000000000',
+  reservaOnlineAtiva: true, pagamentoAutomaticoAtivo: false,
+  expiracaoHoras: 48, salonNome: 'Salão Latitude22',
+  salonCnpj: '', salonContato: '', pixChave: '',
+  feriados: []
+};
 
 export const getReservaConfig = async (): Promise<ReservaConfig> => {
   try {
     const snap = await getDoc(doc(db, 'reservaConfig', 'default'));
-    if (snap.exists()) return snap.data() as ReservaConfig;
+    if (snap.exists()) {
+      const data = snap.data() as any;
+      // Garante que feriados é sempre um array válido com campos normalizados
+      const feriados: Feriado[] = Array.isArray(data.feriados)
+        ? data.feriados
+            .filter((f: any) => f && typeof f.dateStr === 'string' && f.dateStr.match(/^\d{4}-\d{2}-\d{2}$/))
+            .map((f: any) => ({
+              dateStr: String(f.dateStr).trim(),
+              nome:    String(f.nome || '').trim(),
+              valor:   f.valor != null && !isNaN(Number(f.valor)) ? Number(f.valor) : undefined
+            }))
+        : [];
+      return { ...CONFIG_DEFAULT, ...data, feriados };
+    }
   } catch (e) { console.warn('Erro ao buscar config:', e); }
-  return {
-    valorDiaUtil: 1500, valorSabado: 2500, valorDomingo: 2000,
-    valorFimDeSemana: 4000, valorSexta: 2000, valorFeriado: 2500,
-    percentualReserva: 30,
-    whatsappLink: 'https://wa.me/5521000000000',
-    reservaOnlineAtiva: true, pagamentoAutomaticoAtivo: false,
-    expiracaoHoras: 48, salonNome: 'Salão Latitude22',
-    salonCnpj: '', salonContato: '', pixChave: '',
-    feriados: []
-  };
+  return { ...CONFIG_DEFAULT };
 };
 
+// Usa setDoc SEM merge para garantir que o array feriados seja sempre gravado por completo
 export const saveReservaConfig = async (config: Partial<ReservaConfig>) => {
-  await setDoc(doc(db, 'reservaConfig', 'default'), config, { merge: true });
+  const payload = {
+    ...CONFIG_DEFAULT,
+    ...config,
+    // Normaliza feriados antes de salvar — remove campos undefined
+    feriados: (config.feriados || []).map(f => ({
+      dateStr: f.dateStr,
+      nome:    f.nome,
+      ...(f.valor != null ? { valor: f.valor } : {})
+    }))
+  };
+  await setDoc(doc(db, 'reservaConfig', 'default'), payload);
 };
 
 // ─── CÁLCULO ─────────────────────────────────────────────────────────────────
