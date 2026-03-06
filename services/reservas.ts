@@ -1,409 +1,225 @@
 import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc,
   query, where, serverTimestamp, Timestamp, addDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Reserva, ReservaConfig, ReservaStatus, TipoDiaria, Feriado } from '../types';
+import { Reserva, ReservaConfig, ReservaStatus, TipoDiaria } from '../types';
 
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-
-const CONFIG_DEFAULT: ReservaConfig = {
-  valorDiaUtil: 1500, valorSabado: 2500, valorDomingo: 2000,
-  valorFimDeSemana: 4000, valorSexta: 2000, valorFeriado: 2500,
-  percentualReserva: 30,
-  whatsappLink: 'https://wa.me/5521000000000',
-  reservaOnlineAtiva: true, pagamentoAutomaticoAtivo: false,
-  expiracaoHoras: 48, salonNome: 'Salão Latitude22',
-  salonCnpj: '', salonContato: '', pixChave: '',
-  feriados: []
-};
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
 
 export const getReservaConfig = async (): Promise<ReservaConfig> => {
   try {
     const snap = await getDoc(doc(db, 'reservaConfig', 'default'));
-    if (snap.exists()) {
-      const data = snap.data() as any;
-      // Garante que feriados é sempre um array válido com campos normalizados
-      const feriados: Feriado[] = Array.isArray(data.feriados)
-        ? data.feriados
-            .filter((f: any) => f && typeof f.dateStr === 'string' && f.dateStr.match(/^\d{4}-\d{2}-\d{2}$/))
-            .map((f: any) => ({
-              dateStr: String(f.dateStr).trim(),
-              nome:    String(f.nome || '').trim(),
-              valor:   f.valor != null && !isNaN(Number(f.valor)) ? Number(f.valor) : undefined
-            }))
-        : [];
-      return { ...CONFIG_DEFAULT, ...data, feriados };
-    }
-  } catch (e) { console.warn('Erro ao buscar config:', e); }
-  return { ...CONFIG_DEFAULT };
+    if (snap.exists()) return snap.data() as ReservaConfig;
+  } catch (e) {
+    console.warn('Erro ao buscar config de reservas:', e);
+  }
+  return {
+    valorDiaUtil: 1500,
+    valorSabado: 2500,
+    valorDomingo: 2000,
+    valorFimDeSemana: 4000,
+    percentualReserva: 30,
+    whatsappLink: 'https://wa.me/5521000000000',
+    reservaOnlineAtiva: true,
+    pagamentoAutomaticoAtivo: false,
+    expiracaoHoras: 48,
+    salonNome: 'Salão Latitude22',
+    salonCnpj: '',
+    salonContato: '',
+    pixChave: ''
+  };
 };
 
-// Usa setDoc SEM merge para garantir que o array feriados seja sempre gravado por completo
 export const saveReservaConfig = async (config: Partial<ReservaConfig>) => {
-  const payload = {
-    ...CONFIG_DEFAULT,
-    ...config,
-    // Normaliza feriados antes de salvar — remove campos undefined
-    feriados: (config.feriados || []).map(f => ({
-      dateStr: f.dateStr,
-      nome:    f.nome,
-      ...(f.valor != null ? { valor: f.valor } : {})
-    }))
-  };
-  await setDoc(doc(db, 'reservaConfig', 'default'), payload);
+  await setDoc(doc(db, 'reservaConfig', 'default'), config, { merge: true });
 };
 
 // ─── CÁLCULO ─────────────────────────────────────────────────────────────────
-//
-// REGRAS DE TIPO:
-//   • Feriado cadastrado                       → 'feriado'
-//   • Sexta + Sábado + Domingo (conjunto)      → aplica 'fimdesemana' no total (veja calcularDias)
-//   • Sexta isolada                            → 'sexta'
-//   • Sábado isolado                           → 'sabado'
-//   • Domingo isolado                          → 'domingo'
-//   • Qualquer outro dia                       → 'util'
 
-export const isFeriado = (dateStr: string, config: ReservaConfig): boolean =>
-  (config.feriados || []).some(f => f.dateStr === dateStr);
-
-export const getFeriado = (dateStr: string, config: ReservaConfig) =>
-  (config.feriados || []).find(f => f.dateStr === dateStr);
-
-export const calcularTipoDiaria = (dateStr: string, config?: ReservaConfig): TipoDiaria => {
-  if (config && isFeriado(dateStr, config)) return 'feriado';
-  const dow = new Date(dateStr + 'T12:00:00').getDay();
-  if (dow === 5) return 'sexta';
+export const calcularTipoDiaria = (dateStr: string): TipoDiaria => {
+  const date = new Date(dateStr + 'T12:00:00');
+  const dow = date.getDay();
   if (dow === 6) return 'sabado';
   if (dow === 0) return 'domingo';
   return 'util';
 };
 
-export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig, dateStr?: string): number => {
-  if (tipo === 'feriado' && dateStr) {
-    const f = getFeriado(dateStr, config);
-    return (f?.valor ?? config.valorFeriado) || config.valorFeriado || 2500;
-  }
+export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig): number => {
   switch (tipo) {
-    case 'sexta':       return config.valorSexta      ?? config.valorDiaUtil;
-    case 'sabado':      return config.valorSabado;
-    case 'domingo':     return config.valorDomingo;
+    case 'sabado': return config.valorSabado;
+    case 'domingo': return config.valorDomingo;
     case 'fimdesemana': return config.valorFimDeSemana;
-    default:            return config.valorDiaUtil;
+    default: return config.valorDiaUtil;
   }
 };
 
-// ─── DETECÇÃO DE FIM DE SEMANA COMPLETO ──────────────────────────────────────
-//
-// Se o cliente selecionar Sexta + Sábado + Domingo consecutivos (ou qualquer
-// combinação que forme um pacote Sex+Sáb+Dom), aplica o valorFimDeSemana
-// no lugar de cobrar cada dia separado.
-
-export const calcularDias = (
-  datasStr: string[],
-  config: ReservaConfig
-): Array<{ dateStr: string; tipoDiaria: TipoDiaria; valor: number }> => {
-
-  // Primeiro calcula o tipo individual de cada data
-  const dias = datasStr.map(d => ({
-    dateStr:    d,
-    tipoDiaria: calcularTipoDiaria(d, config) as TipoDiaria,
-    valor:      0
-  }));
-
-  // Detecta pacotes Sex+Sáb+Dom consecutivos
-  const usados = new Set<string>();
-
-  for (let i = 0; i < dias.length - 2; i++) {
-    const a = dias[i], b = dias[i + 1], c = dias[i + 2];
-    if (usados.has(a.dateStr) || usados.has(b.dateStr) || usados.has(c.dateStr)) continue;
-
-    const dowA = new Date(a.dateStr + 'T12:00:00').getDay();
-    const dowB = new Date(b.dateStr + 'T12:00:00').getDay();
-    const dowC = new Date(c.dateStr + 'T12:00:00').getDay();
-
-    // Sex=5, Sáb=6, Dom=0 — e devem ser dias consecutivos
-    const isFimDeSemanaCompleto =
-      dowA === 5 && dowB === 6 && dowC === 0 &&
-      !isFeriado(a.dateStr, config) && !isFeriado(b.dateStr, config) && !isFeriado(c.dateStr, config);
-
-    if (isFimDeSemanaCompleto) {
-      // Distribui o valor do pacote entre os 3 dias (1/3 cada para o breakdown)
-      const valorPacote = config.valorFimDeSemana;
-      a.tipoDiaria = 'fimdesemana';
-      b.tipoDiaria = 'fimdesemana';
-      c.tipoDiaria = 'fimdesemana';
-      // Valor fracionado só para exibição; o total é correto
-      a.valor = Math.round(valorPacote / 3);
-      b.valor = Math.round(valorPacote / 3);
-      c.valor = valorPacote - 2 * Math.round(valorPacote / 3);
-      usados.add(a.dateStr);
-      usados.add(b.dateStr);
-      usados.add(c.dateStr);
-    }
-  }
-
-  // Dias que não fazem parte de pacote → valor individual
-  dias.forEach(d => {
-    if (!usados.has(d.dateStr)) {
-      d.valor = calcularValor(d.tipoDiaria, config, d.dateStr);
-    }
-  });
-
-  return dias;
-};
-
-// ─── TOKEN / PROTOCOLO ────────────────────────────────────────────────────────
+// ─── TOKEN E PROTOCOLO ───────────────────────────────────────────────────────
 
 export const gerarToken = (): string => {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return Array.from({ length: 12 }, () =>
+    chars[Math.floor(Math.random() * chars.length)]
+  ).join('');
 };
 
 export const gerarProtocolo = (): string => {
-  const n = new Date();
-  return `L22-${n.getFullYear()}${String(n.getMonth()+1).padStart(2,'0')}${String(n.getDate()).padStart(2,'0')}-${Math.floor(Math.random()*9000+1000)}`;
+  const now = new Date();
+  return `L22-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 9000 + 1000)}`;
 };
 
 // ─── DISPONIBILIDADE ─────────────────────────────────────────────────────────
-//
-// ⚠️ REGRA: só RESERVADO e CONFIRMADO bloqueiam o calendário.
-//    PENDENTE_PAGAMENTO NÃO bloqueia — o cliente só reservou depois de pagar.
+
+export const verificarDisponibilidade = async (data: string): Promise<boolean> => {
+  const q = query(
+    collection(db, 'reservas'),
+    where('data', '==', data),
+    where('status', 'in', [
+      ReservaStatus.PENDENTE_PAGAMENTO,
+      ReservaStatus.RESERVADO,
+      ReservaStatus.CONFIRMADO
+    ])
+  );
+  const snap = await getDocs(q);
+  return snap.empty;
+};
 
 export const getDatasOcupadas = async (): Promise<string[]> => {
   try {
-    const q    = query(
+    const q = query(
       collection(db, 'reservas'),
-      where('status', 'in', [ReservaStatus.RESERVADO, ReservaStatus.CONFIRMADO])
+      where('status', 'in', [
+        ReservaStatus.PENDENTE_PAGAMENTO,
+        ReservaStatus.RESERVADO,
+        ReservaStatus.CONFIRMADO
+      ])
     );
     const snap = await getDocs(q);
-    const set  = new Set<string>();
-    snap.docs.forEach(d => {
-      const r = d.data();
-      if (r.data) set.add(r.data as string);
-      if (Array.isArray(r.datas)) (r.datas as string[]).forEach(dt => set.add(dt));
-    });
-    return Array.from(set);
+    return snap.docs.map(d => d.data().data as string);
   } catch (e) {
-    console.warn('Erro datas ocupadas:', e);
+    console.warn('Erro ao buscar datas ocupadas:', e);
     return [];
   }
 };
 
-export const verificarDisponibilidade = async (data: string): Promise<boolean> => {
-  const status = [ReservaStatus.RESERVADO, ReservaStatus.CONFIRMADO];
-  const s1 = await getDocs(query(collection(db, 'reservas'), where('data', '==', data), where('status', 'in', status)));
-  if (!s1.empty) return false;
-  const s2 = await getDocs(query(collection(db, 'reservas'), where('datas', 'array-contains', data), where('status', 'in', status)));
-  return s2.empty;
-};
+// ─── CRIAR RESERVA ───────────────────────────────────────────────────────────
 
-// ─── CRIAR RASCUNHO ───────────────────────────────────────────────────────────
-//
-// Cria a reserva com status PENDENTE_PAGAMENTO.
-// A data NÃO é bloqueada — só bloqueia quando o admin marcar como pago.
-
-export const criarReservaRascunho = async (
-  dias: Array<{ dateStr: string; tipoDiaria: TipoDiaria; valor: number }>,
+export const criarReserva = async (
+  data: string,
+  tipoDiaria: TipoDiaria,
   config: ReservaConfig,
   cliente: {
-    nome: string; cpfCnpj: string; telefone: string; email: string;
-    tipoEvento: string; numConvidados: number;
-    tipoPagamentoSolicitado?: 'reserva' | 'total';
-  }
+    nome: string;
+    cpfCnpj: string;
+    telefone: string;
+    email: string;
+    tipoEvento: string;
+    numConvidados: number;
+  },
+  criadoPorAdmin = false
 ): Promise<Reserva> => {
-  if (!dias.length) throw new Error('Selecione pelo menos uma data.');
-
-  for (const dia of dias) {
-    const ok = await verificarDisponibilidade(dia.dateStr);
-    if (!ok) {
-      const [y, m, d] = dia.dateStr.split('-');
-      throw new Error(`A data ${d}/${m}/${y} já foi reservada. Escolha outra.`);
-    }
+  const disponivel = await verificarDisponibilidade(data);
+  if (!disponivel) {
+    throw new Error('Esta data não está disponível. Por favor, escolha outra.');
   }
 
-  const valorTotal   = dias.reduce((s, d) => s + d.valor, 0);
+  const valorTotal = calcularValor(tipoDiaria, config);
   const valorReserva = Math.ceil(valorTotal * config.percentualReserva / 100);
-  const token        = gerarToken();
-  const primo        = dias[0];
+  const token = gerarToken();
 
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + config.expiracaoHoras);
 
-  const data: any = {
+  const reservaData: Omit<Reserva, 'id'> = {
     token,
-    data:                    primo.dateStr,
-    datas:                   dias.map(d => d.dateStr),
-    diasDetalhes:            dias,
-    tipoDiaria:              primo.tipoDiaria,
+    data,
+    tipoDiaria,
     valorTotal,
     valorReserva,
-    percentualReserva:       config.percentualReserva,
-    status:                  ReservaStatus.PENDENTE_PAGAMENTO,
-    clienteNome:             cliente.nome,
-    clienteCpfCnpj:          cliente.cpfCnpj,
-    clienteTelefone:         cliente.telefone,
-    clienteEmail:            cliente.email,
-    tipoEvento:              cliente.tipoEvento,
-    numConvidados:           cliente.numConvidados,
-    tipoPagamentoSolicitado: cliente.tipoPagamentoSolicitado || 'reserva',
-    createdAt:               serverTimestamp(),
-    expiresAt:               Timestamp.fromDate(expiresAt),
-    criadoPorAdmin:          false
+    percentualReserva: config.percentualReserva,
+    status: ReservaStatus.PENDENTE_PAGAMENTO,
+    clienteNome: cliente.nome,
+    clienteCpfCnpj: cliente.cpfCnpj,
+    clienteTelefone: cliente.telefone,
+    clienteEmail: cliente.email,
+    tipoEvento: cliente.tipoEvento,
+    numConvidados: cliente.numConvidados,
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(expiresAt),
+    criadoPorAdmin
   };
 
-  const ref = await addDoc(collection(db, 'reservas'), data);
-  return { id: ref.id, ...data } as Reserva;
+  const ref = await addDoc(collection(db, 'reservas'), reservaData);
+  return { id: ref.id, ...reservaData } as Reserva;
 };
 
-// ─── CONFIRMAR PAGAMENTO (admin) ──────────────────────────────────────────────
-//
-// Registra o pagamento, muda o status, e lança no financeiro:
-//   • 1 entrada = valorPago
-//   • Se pagamento parcial (reserva/sinal): registra o saldo restante
-//     como "a receber" no documento da própria reserva (campo saldoPendente)
+// ─── CONFIRMAR PAGAMENTO ─────────────────────────────────────────────────────
 
 export const confirmarPagamento = async (
   reservaId: string,
-  valorPago: number,
+  valorNovoPagamento: number,  // valor recebido NESTA transação
   formaPagamento: string,
   transacaoId?: string
 ): Promise<string> => {
-  const ref  = doc(db, 'reservas', reservaId);
+  const ref = doc(db, 'reservas', reservaId);
   const snap = await getDoc(ref);
   if (!snap.exists()) throw new Error('Reserva não encontrada.');
 
-  const reserva    = snap.data() as Reserva;
-  const isPago100  = valorPago >= reserva.valorTotal;
-  const protocolo  = (reserva as any).protocolo || gerarProtocolo();
-  const saldo      = Math.max(0, reserva.valorTotal - valorPago);
-  const datas      = Array.isArray((reserva as any).datas) ? (reserva as any).datas : [reserva.data];
-  const dataLabel  = datas.map((d: string) => { const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }).join(', ');
+  const reserva = snap.data() as Reserva;
+  const protocolo = reserva.protocolo || gerarProtocolo();
+
+  // ⚠️ ACUMULA: soma o novo ao que já foi pago antes
+  const valorJaPago    = Number(reserva.valorPago) || 0;
+  const valorTotalPago = valorJaPago + valorNovoPagamento;
+  const isPago100      = valorTotalPago >= reserva.valorTotal;
+  // saldoPendente = quanto falta APÓS esta transação (0 se quitado)
+  const saldoPendente  = Math.max(0, reserva.valorTotal - valorTotalPago);
 
   await updateDoc(ref, {
-    status:         isPago100 ? ReservaStatus.CONFIRMADO : ReservaStatus.RESERVADO,
-    valorPago,
-    saldoPendente:  saldo,
+    status:        isPago100 ? ReservaStatus.CONFIRMADO : ReservaStatus.RESERVADO,
+    valorPago:     valorTotalPago,   // total acumulado
+    saldoPendente,                   // 0 quando quitado → some do "A Receber"
     formaPagamento,
-    transacaoId:    transacaoId || '',
+    transacaoId:   transacaoId || '',
     protocolo,
-    dataPagamento:  serverTimestamp()
+    dataPagamento: serverTimestamp()
   });
 
-  // ── Lançamento de ENTRADA no financeiro ──────────────────────────────────
+  // Lança APENAS o valor desta transação no financeiro
+  const isQuitacao = valorJaPago > 0;
   await addDoc(collection(db, 'financial'), {
     type:        'income',
-    amount:      valorPago,
-    description: `Reserva ${protocolo} — ${reserva.clienteNome} (${dataLabel})`,
-    // date como 'YYYY-MM-DD' para filtros do FinancialPage funcionarem
+    amount:      valorNovoPagamento,
+    description: isQuitacao
+      ? `Quitação — ${protocolo} — ${reserva.clienteNome}`
+      : `Reserva ${protocolo} — ${reserva.clienteNome}`,
     date:        new Date().toISOString().split('T')[0],
-    category:    isPago100 ? 'Reserva — Pagamento Total' : 'Reserva — Sinal/Entrada',
+    category:    isQuitacao ? 'Reserva — Quitação' : (isPago100 ? 'Reserva — Pagamento Total' : 'Reserva — Sinal/Entrada'),
     reservaId,
-    protocolo,
-    // Campos extras para o card "A Receber" da tesouraria identificar a origem
-    origem:      'reserva_online',
-    clienteNome: reserva.clienteNome,
     createdAt:   serverTimestamp()
   });
-
-  // ── Sincroniza saldoPendente no documento da reserva ─────────────────────
-  // Garante que o campo existe para o listener do FinancialPage calcular corretamente
-  if (!isPago100 && saldo > 0) {
-    // já foi feito no updateDoc acima com saldoPendente: saldo
-  }
 
   return protocolo;
 };
 
-// ─── ESTORNAR LANÇAMENTOS DA RESERVA ─────────────────────────────────────────
-//
-// Busca e deleta todos os lançamentos em `financial` vinculados à reserva,
-// e se havia pagamento real (valorPago > 0), registra um lançamento de ESTORNO
-// para manter o histórico auditável.
-
-const estornarFinanceiro = async (reserva: Reserva): Promise<void> => {
-  const reservaId = reserva.id;
-
-  // Busca todos os lançamentos com este reservaId
-  const qFinancial = query(
-    collection(db, 'financial'),
-    where('reservaId', '==', reservaId)
-  );
-  const snapFinancial = await getDocs(qFinancial);
-
-  // Soma o total que havia sido lançado como receita
-  let totalEstornado = 0;
-  for (const d of snapFinancial.docs) {
-    const t = d.data();
-    if (t.type === 'income' && t.amount > 0) totalEstornado += Number(t.amount);
-    await deleteDoc(d.ref);   // remove o lançamento original
-  }
-
-  // Se houve dinheiro recebido, registra estorno para histórico
-  if (totalEstornado > 0) {
-    const protocolo = (reserva as any).protocolo || reservaId;
-    const datas     = Array.isArray((reserva as any).datas) ? (reserva as any).datas : [reserva.data];
-    const dataLabel = datas.map((d: string) => { const [y,m,dia] = d.split('-'); return `${dia}/${m}/${y}`; }).join(', ');
-
-    await addDoc(collection(db, 'financial'), {
-      type:        'expense',
-      amount:      totalEstornado,
-      description: `Estorno — Reserva ${protocolo} — ${reserva.clienteNome} (${dataLabel})`,
-      date:        new Date().toISOString().split('T')[0],
-      category:    'Estorno de Reserva',
-      reservaId,
-      protocolo,
-      estorno:     true,
-      createdAt:   serverTimestamp()
-    });
-  }
-};
-
-// Cancela → status CANCELADO → data volta ao calendário + estorna financeiro
 export const cancelarReserva = async (reservaId: string): Promise<void> => {
-  const snap = await getDoc(doc(db, 'reservas', reservaId));
-  if (!snap.exists()) return;
-
-  const reserva = { id: reservaId, ...snap.data() } as Reserva;
-
-  // Só estorna se já havia pagamento registrado
-  if (reserva.valorPago && reserva.valorPago > 0) {
-    await estornarFinanceiro(reserva);
-  }
-
   await updateDoc(doc(db, 'reservas', reservaId), {
-    status:        ReservaStatus.CANCELADO,
-    saldoPendente: 0,
-    canceladoEm:   serverTimestamp()
+    status: ReservaStatus.CANCELADO
   });
 };
 
-// Apaga permanentemente → estorna financeiro + deleta reserva
-export const apagarReserva = async (reservaId: string): Promise<void> => {
-  const snap = await getDoc(doc(db, 'reservas', reservaId));
-  if (!snap.exists()) {
-    await deleteDoc(doc(db, 'reservas', reservaId));
-    return;
-  }
-
-  const reserva = { id: reservaId, ...snap.data() } as Reserva;
-
-  if (reserva.valorPago && reserva.valorPago > 0) {
-    await estornarFinanceiro(reserva);
-  }
-
-  await deleteDoc(doc(db, 'reservas', reservaId));
-};
-
-// ─── BUSCAR ───────────────────────────────────────────────────────────────────
+// ─── BUSCAR ──────────────────────────────────────────────────────────────────
 
 export const getReservaPorToken = async (token: string): Promise<Reserva | null> => {
   try {
-    const snap = await getDocs(query(collection(db, 'reservas'), where('token', '==', token)));
+    const q = query(collection(db, 'reservas'), where('token', '==', token));
+    const snap = await getDocs(q);
     if (snap.empty) return null;
     const d = snap.docs[0];
     return { id: d.id, ...d.data() } as Reserva;
-  } catch { return null; }
+  } catch (e) {
+    return null;
+  }
 };
 
 export const getReservaById = async (id: string): Promise<Reserva | null> => {
@@ -411,15 +227,16 @@ export const getReservaById = async (id: string): Promise<Reserva | null> => {
     const snap = await getDoc(doc(db, 'reservas', id));
     if (!snap.exists()) return null;
     return { id: snap.id, ...snap.data() } as Reserva;
-  } catch { return null; }
+  } catch (e) {
+    return null;
+  }
 };
 
 export const getAllReservas = async (): Promise<Reserva[]> => {
   try {
     const snap = await getDocs(collection(db, 'reservas'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as Reserva));
-  } catch { return []; }
+  } catch (e) {
+    return [];
+  }
 };
-
-// Retrocompatibilidade
-export const criarReserva = criarReservaRascunho as any;
