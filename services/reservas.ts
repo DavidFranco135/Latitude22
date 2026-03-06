@@ -295,12 +295,22 @@ export const confirmarPagamento = async (
     type:        'income',
     amount:      valorPago,
     description: `Reserva ${protocolo} — ${reserva.clienteNome} (${dataLabel})`,
+    // date como 'YYYY-MM-DD' para filtros do FinancialPage funcionarem
     date:        new Date().toISOString().split('T')[0],
     category:    isPago100 ? 'Reserva — Pagamento Total' : 'Reserva — Sinal/Entrada',
     reservaId,
     protocolo,
+    // Campos extras para o card "A Receber" da tesouraria identificar a origem
+    origem:      'reserva_online',
+    clienteNome: reserva.clienteNome,
     createdAt:   serverTimestamp()
   });
+
+  // ── Sincroniza saldoPendente no documento da reserva ─────────────────────
+  // Garante que o campo existe para o listener do FinancialPage calcular corretamente
+  if (!isPago100 && saldo > 0) {
+    // já foi feito no updateDoc acima com saldoPendente: saldo
+  }
 
   return protocolo;
 };
