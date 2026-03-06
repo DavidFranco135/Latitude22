@@ -87,8 +87,12 @@ const FinancialPage: React.FC = () => {
   }, []);
 
   // ── Reservas online com saldo pendente ─────────────────────────────────────
-  // Escuta reservas com status RESERVADO (pagamento parcial = sinal pago, saldo a receber)
+  // Escuta TODAS as reservas com status que indica saldo a receber:
+  //   • reservado  = sinal pago, resta o saldo
+  //   • confirmado = pode ter sido pago parcialmente antes de ser confirmado
+  // Filtra apenas as que têm saldo > 0 (calculado de forma defensiva)
   useEffect(() => {
+    // Busca reservado E confirmado — confirmado pode ter saldo se foi editado
     const q = query(
       collection(db, 'reservas'),
       where('status', 'in', ['reservado', 'confirmado'])
@@ -96,21 +100,31 @@ const FinancialPage: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const items: ReservaOnline[] = snapshot.docs
         .map(d => {
-          const r = d.data();
+          const r          = d.data();
+          const valorTotal  = Number(r.valorTotal)  || 0;
+          const valorPago   = Number(r.valorPago)   || 0;
+          // saldoPendente: usa o campo se existir e for >= 0; senão calcula
+          const saldoPendente =
+            (r.saldoPendente !== undefined && r.saldoPendente !== null)
+              ? Math.max(0, Number(r.saldoPendente))
+              : Math.max(0, valorTotal - valorPago);
+          const datas: string[] = Array.isArray(r.datas) && r.datas.length
+            ? r.datas
+            : r.data ? [r.data] : [];
           return {
             id:            d.id,
-            clienteNome:   r.clienteNome || '—',
-            valorTotal:    Number(r.valorTotal) || 0,
-            valorPago:     Number(r.valorPago)  || 0,
-            saldoPendente: Number(r.saldoPendente) || Math.max(0, (r.valorTotal || 0) - (r.valorPago || 0)),
-            status:        r.status,
-            data:          r.data || '',
-            datas:         r.datas,
+            clienteNome:   r.clienteNome  || '—',
+            valorTotal,
+            valorPago,
+            saldoPendente,
+            status:        r.status       || 'reservado',
+            data:          r.data         || datas[0] || '',
+            datas,
             protocolo:     r.protocolo,
-            tipoEvento:    r.tipoEvento
+            tipoEvento:    r.tipoEvento   || 'Evento'
           };
         })
-        .filter(r => r.saldoPendente > 0);   // só os que têm saldo devedor
+        .filter(r => r.saldoPendente > 0);  // só os que realmente têm saldo
       setReservasOnline(items);
     });
     return () => unsubscribe();
