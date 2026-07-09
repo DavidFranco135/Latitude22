@@ -121,6 +121,12 @@ const AgendaPage: React.FC = () => {
   const [showModal,      setShowModal]      = useState(false);
   const [showClientModal,setShowClientModal]= useState(false);
   const [editingApt,     setEditingApt]     = useState<Appointment | null>(null);
+  const [showReservaModal, setShowReservaModal] = useState(false);
+  const [editingReserva,   setEditingReserva]   = useState<ReservaOnline | null>(null);
+  const [reservaFormData,  setReservaFormData]  = useState({
+    client: '', telefone: '', tipoEvento: '', status: 'reservado',
+    valorTotal: 0, valorPago: 0
+  });
   const [activeMenuId,   setActiveMenuId]   = useState<string | null>(null);
   const [message,        setMessage]        = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -350,6 +356,51 @@ const AgendaPage: React.FC = () => {
     setFormData({ ...emptyForm, date: selectedDate });
   };
 
+  // ── Edição de Reserva Online (ou histórica importada) ────────────────────
+  const openEditReservaModal = (r: ReservaOnline) => {
+    setEditingReserva(r);
+    setReservaFormData({
+      client: r.client,
+      telefone: r.telefone || '',
+      tipoEvento: r.tipoEvento,
+      status: r.status,
+      valorTotal: r.valorTotal,
+      valorPago: r.valorPago
+    });
+    setShowReservaModal(true);
+    setActiveMenuId(null);
+  };
+
+  const closeReservaModal = () => {
+    setShowReservaModal(false);
+    setEditingReserva(null);
+  };
+
+  const handleSaveReserva = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReserva) return;
+    try {
+      const valorTotal = Number(reservaFormData.valorTotal) || 0;
+      const valorPago  = Number(reservaFormData.valorPago) || 0;
+      const saldoPendente = Math.max(0, valorTotal - valorPago);
+
+      await updateDoc(doc(db, 'reservas', editingReserva.id), {
+        clienteNome:    reservaFormData.client,
+        clienteTelefone: reservaFormData.telefone,
+        tipoEvento:     reservaFormData.tipoEvento,
+        status:         reservaFormData.status,
+        valorTotal,
+        valorPago,
+        saldoPendente
+      });
+
+      showMsg('Reserva atualizada!');
+      closeReservaModal();
+    } catch (err: any) {
+      showMsg('Erro ao salvar: ' + (err.message || 'tente novamente'));
+    }
+  };
+
   // ── Cards ──────────────────────────────────────────────────────────────────
 
   const MenuApt = ({ apt }: { apt: Appointment }) => (
@@ -410,9 +461,28 @@ const AgendaPage: React.FC = () => {
   );
 
   const CardReserva = ({ r, showAllDates = false }: { r: ReservaOnline; showAllDates?: boolean }) => (
-    <div className={`rounded-xl p-4 border border-white/5 ${RESERVA_COR[r.status] || 'border-l-4 border-l-stone-600 bg-stone-900'} transition-all`}>
+    <div className={`relative rounded-xl p-4 border border-white/5 ${RESERVA_COR[r.status] || 'border-l-4 border-l-stone-600 bg-stone-900'} transition-all`}>
+      {/* Menu de ações */}
+      <div className="absolute right-3 top-3">
+        <button
+          onClick={e => { e.stopPropagation(); setActiveMenuId(activeMenuId === `r-${r.id}` ? null : `r-${r.id}`); }}
+          className="p-2 -m-2 text-stone-500 hover:text-amber-500 transition-colors"
+          style={{ minWidth: '40px', minHeight: '40px' }}
+        >
+          <MoreVertical size={16} />
+        </button>
+        {activeMenuId === `r-${r.id}` && (
+          <div ref={menuRef} className="absolute right-0 top-8 z-[200] w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
+            <button onClick={e => { e.stopPropagation(); openEditReservaModal(r); }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white">
+              <Edit2 size={14}/>Editar Reserva
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Badges */}
-      <div className="flex items-center gap-2 flex-wrap mb-2">
+      <div className="flex items-center gap-2 flex-wrap mb-2 pr-8">
         <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-indigo-900/30 text-indigo-400 border border-indigo-700/30">
           <BookOpen size={9}/>Online
         </span>
@@ -821,6 +891,95 @@ const AgendaPage: React.FC = () => {
                 <button type="submit"
                   className="flex-1 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
                   {editingApt ? 'Salvar' : 'Agendar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Editar Reserva Online ── */}
+      {showReservaModal && editingReserva && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/90 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-stone-900 border border-white/10 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-serif text-xl font-bold text-stone-100">Editar Reserva</h3>
+              <button onClick={closeReservaModal} className="text-stone-500 hover:text-white"><X size={20}/></button>
+            </div>
+
+            {editingReserva.datas.length > 1 && (
+              <div className="mb-4 p-3 rounded-lg bg-amber-900/10 border border-amber-700/20 text-xs text-amber-400">
+                ⚠️ Essa reserva tem {editingReserva.datas.length} datas ({editingReserva.datas.map(fmtBR).join(', ')}).
+                A edição aqui altera apenas este registro.
+              </div>
+            )}
+
+            <form onSubmit={handleSaveReserva} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Cliente *</label>
+                <input required value={reservaFormData.client}
+                  onChange={e => setReservaFormData(f => ({ ...f, client: e.target.value }))}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"/>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Telefone</label>
+                  <input value={reservaFormData.telefone}
+                    onChange={e => setReservaFormData(f => ({ ...f, telefone: e.target.value }))}
+                    className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"/>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Tipo de Evento</label>
+                  <input value={reservaFormData.tipoEvento}
+                    onChange={e => setReservaFormData(f => ({ ...f, tipoEvento: e.target.value }))}
+                    className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"/>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">Status</label>
+                <select value={reservaFormData.status}
+                  onChange={e => setReservaFormData(f => ({ ...f, status: e.target.value }))}
+                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none">
+                  <option value="pendente_pagamento">Aguardando Pagamento</option>
+                  <option value="reservado">Sinal Pago — Saldo Pendente</option>
+                  <option value="confirmado">Pago Integralmente</option>
+                  <option value="cancelado">Cancelado</option>
+                  <option value="expirado">Expirado</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">💰 Valor Total (R$)</label>
+                  <input type="number" value={reservaFormData.valorTotal}
+                    onChange={e => setReservaFormData(f => ({ ...f, valorTotal: parseFloat(e.target.value) || 0 }))}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="0,00" step="0.01" min="0"/>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-2 block">💵 Valor Já Pago (R$)</label>
+                  <input type="number" value={reservaFormData.valorPago}
+                    onChange={e => setReservaFormData(f => ({ ...f, valorPago: parseFloat(e.target.value) || 0 }))}
+                    className="w-full rounded-lg border border-white/10 bg-stone-950 px-4 py-2.5 text-sm text-stone-200 focus:border-amber-600 focus:outline-none"
+                    placeholder="0,00" step="0.01" min="0"/>
+                </div>
+              </div>
+              {reservaFormData.valorTotal > 0 && (
+                <p className="text-xs text-amber-400 -mt-2">
+                  Saldo pendente: {fmt(Math.max(0, (reservaFormData.valorTotal || 0) - (reservaFormData.valorPago || 0)))}
+                </p>
+              )}
+
+              <div className="flex gap-4 pt-2">
+                <button type="button" onClick={closeReservaModal}
+                  className="flex-1 rounded-lg border border-white/10 bg-stone-950 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:bg-stone-800 transition-all">
+                  Cancelar
+                </button>
+                <button type="submit"
+                  className="flex-1 rounded-lg bg-amber-600 px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-amber-700 transition-all">
+                  Salvar Alterações
                 </button>
               </div>
             </form>
