@@ -19,6 +19,8 @@ export const getReservaConfig = async (): Promise<ReservaConfig> => {
     valorSabado: 2500,
     valorDomingo: 2000,
     valorFimDeSemana: 4000,
+    valorSexta: 1500,
+    valorFeriado: 2500,
     percentualReserva: 30,
     whatsappLink: 'https://wa.me/5521000000000',
     reservaOnlineAtiva: true,
@@ -50,8 +52,91 @@ export const calcularValor = (tipo: TipoDiaria, config: ReservaConfig): number =
     case 'sabado': return config.valorSabado;
     case 'domingo': return config.valorDomingo;
     case 'fimdesemana': return config.valorFimDeSemana;
+    case 'sexta': return config.valorSexta ?? config.valorDiaUtil;
+    case 'feriado': return config.valorFeriado ?? config.valorDiaUtil;
     default: return config.valorDiaUtil;
   }
+};
+
+// ─── FERIADOS ────────────────────────────────────────────────────────────────
+
+export const isFeriado = (dateStr: string, config: ReservaConfig): boolean => {
+  return !!(config.feriados || []).some(f => f.dateStr === dateStr);
+};
+
+export const getFeriado = (dateStr: string, config: ReservaConfig) => {
+  return (config.feriados || []).find(f => f.dateStr === dateStr);
+};
+
+const addDays = (dateStr: string, days: number): string => {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+};
+
+// ─── MULTI-DATA: calcula tipo e valor de cada dia selecionado ───────────────
+// Detecta pacote Sexta + Sábado + Domingo (mesmo fim de semana) e aplica
+// o valor de fim de semana dividido entre os 3 dias. Feriados têm prioridade.
+
+export interface DiaDetalhe {
+  dateStr: string;
+  tipoDiaria: TipoDiaria;
+  valor: number;
+}
+
+export const calcularDias = (datas: string[], config: ReservaConfig): DiaDetalhe[] => {
+  const datasSet = new Set(datas);
+  const processadas = new Set<string>();
+  const resultado: DiaDetalhe[] = [];
+  const datasOrdenadas = [...datas].sort();
+
+  for (const dateStr of datasOrdenadas) {
+    if (processadas.has(dateStr)) continue;
+
+    const feriado = getFeriado(dateStr, config);
+    const dow = new Date(dateStr + 'T12:00:00').getDay();
+
+    // Pacote Sexta + Sábado + Domingo (só aplica se nenhum dos 3 for feriado)
+    if (dow === 5 && !feriado) {
+      const sabado = addDays(dateStr, 1);
+      const domingo = addDays(dateStr, 2);
+      const sabadoFeriado = getFeriado(sabado, config);
+      const domingoFeriado = getFeriado(domingo, config);
+      if (datasSet.has(sabado) && datasSet.has(domingo) && !sabadoFeriado && !domingoFeriado) {
+        const valorPorDia = Math.round((config.valorFimDeSemana / 3) * 100) / 100;
+        [dateStr, sabado, domingo].forEach(d => {
+          resultado.push({ dateStr: d, tipoDiaria: 'fimdesemana', valor: valorPorDia });
+          processadas.add(d);
+        });
+        continue;
+      }
+    }
+
+    let tipo: TipoDiaria;
+    let valor: number;
+
+    if (feriado) {
+      tipo = 'feriado';
+      valor = feriado.valor ?? config.valorFeriado ?? config.valorDiaUtil;
+    } else if (dow === 5) {
+      tipo = 'sexta';
+      valor = config.valorSexta ?? config.valorDiaUtil;
+    } else if (dow === 6) {
+      tipo = 'sabado';
+      valor = config.valorSabado;
+    } else if (dow === 0) {
+      tipo = 'domingo';
+      valor = config.valorDomingo;
+    } else {
+      tipo = 'util';
+      valor = config.valorDiaUtil;
+    }
+
+    resultado.push({ dateStr, tipoDiaria: tipo, valor });
+    processadas.add(dateStr);
+  }
+
+  return resultado.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 };
 
 // ─── TOKEN E PROTOCOLO ───────────────────────────────────────────────────────
@@ -144,6 +229,71 @@ export const criarReserva = async (
     clienteEmail: cliente.email,
     tipoEvento: cliente.tipoEvento,
     numConvidados: cliente.numConvidados,
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(expiresAt),
+    criadoPorAdmin
+  };
+
+  const ref = await addDoc(collection(db, 'reservas'), reservaData);
+  return { id: ref.id, ...reservaData } as Reserva;
+};
+
+// ─── CRIAR RESERVA (RASCUNHO / MULTI-DATA) ───────────────────────────────────
+// Usada pelo formulário público de reserva (ReservaPage), que permite
+// selecionar várias datas de uma vez (ex: Sex+Sáb+Dom como pacote).
+
+export const criarReservaRascunho = async (
+  diasSelecionados: DiaDetalhe[],
+  config: ReservaConfig,
+  cliente: {
+    nome: string;
+    cpfCnpj: string;
+    telefone: string;
+    email: string;
+    tipoEvento: string;
+    numConvidados: number;
+    tipoPagamentoSolicitado?: 'reserva' | 'total';
+  },
+  criadoPorAdmin = false
+): Promise<Reserva> => {
+  if (!diasSelecionados.length) {
+    throw new Error('Selecione ao menos uma data para continuar.');
+  }
+
+  // Confirma que todas as datas escolhidas continuam disponíveis
+  for (const dia of diasSelecionados) {
+    const disponivel = await verificarDisponibilidade(dia.dateStr);
+    if (!disponivel) {
+      const [y, m, d] = dia.dateStr.split('-');
+      throw new Error(`A data ${d}/${m}/${y} não está mais disponível. Por favor, escolha outra.`);
+    }
+  }
+
+  const datas = diasSelecionados.map(d => d.dateStr).sort();
+  const valorTotal = diasSelecionados.reduce((s, d) => s + d.valor, 0);
+  const valorReserva = Math.ceil(valorTotal * config.percentualReserva / 100);
+  const token = gerarToken();
+
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + config.expiracaoHoras);
+
+  const reservaData: any = {
+    token,
+    data: datas[0],
+    datas,
+    diasDetalhes: diasSelecionados,
+    tipoDiaria: diasSelecionados[0].tipoDiaria,
+    valorTotal,
+    valorReserva,
+    percentualReserva: config.percentualReserva,
+    status: ReservaStatus.PENDENTE_PAGAMENTO,
+    clienteNome: cliente.nome,
+    clienteCpfCnpj: cliente.cpfCnpj,
+    clienteTelefone: cliente.telefone,
+    clienteEmail: cliente.email,
+    tipoEvento: cliente.tipoEvento,
+    numConvidados: cliente.numConvidados,
+    tipoPagamentoSolicitado: cliente.tipoPagamentoSolicitado || 'reserva',
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromDate(expiresAt),
     criadoPorAdmin
