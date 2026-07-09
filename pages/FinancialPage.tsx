@@ -156,10 +156,24 @@ const FinancialPage: React.FC = () => {
     .reduce((s, a) => s + (a.remainingValue || 0), 0);
   const totalReceivable = totalReservasOnlinePendente + totalAppointmentsPendente;
 
-  const chartData = filteredTransactions.slice(0, 6).reverse().map(t => ({
-    name:  new Date(t.date).toLocaleDateString('pt-BR', { month: 'short' }),
-    valor: t.type === 'income' ? t.amount : -t.amount
-  }));
+  const chartData = (() => {
+    const porMes: { [key: string]: number } = {};
+    filteredTransactions.forEach(t => {
+      const d = new Date(t.date);
+      const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const valor = t.type === 'income' ? t.amount : -t.amount;
+      porMes[chave] = (porMes[chave] || 0) + valor;
+    });
+    return Object.entries(porMes)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([chave, valor]) => {
+        const [ano, mes] = chave.split('-');
+        const nomeMes = new Date(Number(ano), Number(mes) - 1, 1)
+          .toLocaleDateString('pt-BR', { month: 'short' });
+        return { name: nomeMes, valor };
+      });
+  })();
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -404,7 +418,7 @@ const FinancialPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Gráfico */}
         <div className="rounded-2xl border border-white/5 bg-stone-900 p-8">
-          <h3 className="text-stone-100 font-bold mb-8">Fluxo Recente</h3>
+          <h3 className="text-stone-100 font-bold mb-8">Faturamento Mensal (Últimos 6 Meses)</h3>
           {chartData.length > 0 ? (
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
