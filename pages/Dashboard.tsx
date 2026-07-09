@@ -26,11 +26,26 @@ const Dashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    // Carregar agendamentos
+    let appointmentsConfirmed = 0;
+    let reservasConfirmed = 0;
+
+    const recalcTotal = () => {
+      setData(prev => ({ ...prev, totalAppointments: appointmentsConfirmed + reservasConfirmed }));
+    };
+
+    // Carregar agendamentos (criados manualmente na Agenda)
     const unsubAppointments = onSnapshot(collection(db, 'appointments'), (snapshot) => {
       const appointments = snapshot.docs.map(doc => doc.data());
-      const confirmed = appointments.filter((a: any) => a.status === 'confirmado').length;
-      setData(prev => ({ ...prev, totalAppointments: confirmed }));
+      appointmentsConfirmed = appointments.filter((a: any) => a.status === 'confirmado').length;
+      recalcTotal();
+    });
+
+    // Carregar reservas (feitas pelo site ou importadas) — conta como evento confirmado
+    // quando o status é 'confirmado' ou 'reservado' (sinal pago)
+    const unsubReservas = onSnapshot(collection(db, 'reservas'), (snapshot) => {
+      const reservas = snapshot.docs.map(doc => doc.data());
+      reservasConfirmed = reservas.filter((r: any) => r.status === 'confirmado' || r.status === 'reservado').length;
+      recalcTotal();
     });
 
     // Carregar clientes
@@ -91,6 +106,7 @@ const Dashboard: React.FC = () => {
 
     return () => {
       unsubAppointments();
+      unsubReservas();
       unsubClients();
       unsubBudgets();
       unsubFinancial();
