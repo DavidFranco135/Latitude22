@@ -307,7 +307,66 @@ const ContractsPage: React.FC = () => {
           </select>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* MOBILE: cards (sem scroll horizontal) */}
+        <div className="md:hidden divide-y divide-white/5">
+          {filteredContracts.length === 0 ? (
+            <div className="px-4 py-8 text-center text-stone-500 text-sm">
+              {searchTerm || statusFilter ? 'Nenhum contrato encontrado' : 'Nenhum contrato cadastrado'}
+            </div>
+          ) : (
+            filteredContracts.map((contract) => {
+              const statusBadge = getStatusBadge(contract.status);
+              return (
+                <div key={contract.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-stone-500 font-mono text-[10px] uppercase truncate">{contract.protocol}</p>
+                      <p className="font-bold text-stone-100 uppercase tracking-wide text-sm truncate">{contract.clientName}</p>
+                    </div>
+                    <span className={`flex-shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest border ${statusBadge.color}`}>
+                      <CheckCircle size={10} />
+                      <span>{statusBadge.text}</span>
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-stone-400">
+                    <span className="font-bold text-amber-500 text-base">{formatCurrency(contract.amount)}</span>
+                    <span>{new Date(contract.eventDate).toLocaleDateString('pt-BR')}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      onClick={() => exportContractToPDF(contract)}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-amber-500 bg-stone-950 rounded-lg border border-white/5"
+                      style={{ minHeight: '44px' }}
+                    >
+                      <Download size={14} /> PDF
+                    </button>
+                    {contract.status === 'pending' && (
+                      <button
+                        onClick={() => updateStatus(contract.id, 'signed')}
+                        className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-green-500 bg-stone-950 rounded-lg border border-white/5"
+                        style={{ minHeight: '44px' }}
+                      >
+                        <CheckCircle size={14} /> Assinado
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteContract(contract.id, contract.clientName)}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-red-400 bg-stone-950 rounded-lg border border-white/5"
+                      style={{ minHeight: '44px' }}
+                    >
+                      <Trash2 size={14} /> Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* DESKTOP: tabela completa */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-stone-950 text-xs font-bold uppercase tracking-widest text-stone-600">
               <tr>
