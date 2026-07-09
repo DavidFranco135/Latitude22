@@ -210,7 +210,88 @@ const ClientsPage: React.FC = () => {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* MOBILE: cards (sem scroll horizontal) */}
+        <div className="md:hidden divide-y divide-white/5">
+          {filteredClients.length === 0 ? (
+            <div className="px-4 py-8 text-center text-stone-600">
+              <p className="text-sm font-medium">Nenhum cliente encontrado</p>
+            </div>
+          ) : (
+            filteredClients.map((client) => (
+              <div key={client.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-amber-600/20 flex items-center justify-center border border-amber-600/30 text-amber-500 font-bold text-xs">
+                      {getInitials(client.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-stone-100 truncate">{client.name}</p>
+                      {client.cpf_cnpj && <p className="text-[10px] text-stone-600">{client.cpf_cnpj}</p>}
+                    </div>
+                  </div>
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={() => setActiveMenuId(activeMenuId === client.id ? null : client.id)}
+                      className="p-2 -m-2 text-stone-500 hover:text-amber-500 transition-colors"
+                      style={{ minWidth: '44px', minHeight: '44px' }}
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+                    {activeMenuId === client.id && (
+                      <div ref={menuRef} className="absolute right-0 top-9 z-50 w-48 rounded-lg bg-stone-800 border border-white/10 shadow-xl overflow-hidden">
+                        <div className="py-1">
+                          <button
+                            onClick={() => handleEdit(client)}
+                            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                          >
+                            <Edit2 size={12} /> Editar Cliente
+                          </button>
+                          <button
+                            onClick={() => {
+                              alert('Visualizar histórico completo do cliente');
+                              setActiveMenuId(null);
+                            }}
+                            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-stone-300 hover:bg-stone-700 hover:text-white"
+                          >
+                            <Eye size={12} /> Ver Histórico
+                          </button>
+                          <div className="h-px bg-white/10 my-1"></div>
+                          <button
+                            onClick={() => handleDelete(client.id, client.name)}
+                            className="flex w-full items-center gap-2 px-4 py-3 text-xs text-red-400 hover:bg-red-500/10"
+                          >
+                            <Trash2 size={12} /> Excluir Cliente
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="flex items-center text-stone-400 space-x-2 min-w-0">
+                    <Phone size={13} className="text-amber-600 flex-shrink-0" />
+                    <span className="truncate">{client.phone || '—'}</span>
+                  </div>
+                  <div className="flex items-center text-stone-400 space-x-2 min-w-0">
+                    <Mail size={13} className="text-amber-600 flex-shrink-0" />
+                    <span className="truncate">{client.email || '—'}</span>
+                  </div>
+                  <div className="flex items-center text-stone-400 space-x-2 min-w-0">
+                    <Calendar size={13} className="flex-shrink-0" />
+                    <span className="truncate">{client.lastEvent || '—'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-bold text-amber-500">{formatCurrency(client.totalRevenue || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* DESKTOP: tabela completa */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="border-b border-white/5 bg-stone-950/50">
               <tr>
