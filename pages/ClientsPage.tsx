@@ -277,12 +277,9 @@ const ClientsPage: React.FC = () => {
                     <Mail size={13} className="text-amber-600 flex-shrink-0" />
                     <span className="truncate">{client.email || '—'}</span>
                   </div>
-                  <div className="flex items-center text-stone-400 space-x-2 min-w-0">
+                  <div className="flex items-center text-stone-400 space-x-2 min-w-0 col-span-2">
                     <Calendar size={13} className="flex-shrink-0" />
                     <span className="truncate">{client.lastEvent || '—'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-amber-500">{formatCurrency(client.totalRevenue || 0)}</span>
                   </div>
                 </div>
               </div>
@@ -304,9 +301,6 @@ const ClientsPage: React.FC = () => {
                 <th className="px-6 py-4">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Último Evento</span>
                 </th>
-                <th className="px-6 py-4">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Faturamento</span>
-                </th>
                 <th className="px-6 py-4 text-right">
                   <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600">Ações</span>
                 </th>
@@ -315,7 +309,7 @@ const ClientsPage: React.FC = () => {
             <tbody>
               {filteredClients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-stone-600">
+                  <td colSpan={4} className="px-6 py-8 text-center text-stone-600">
                     <p className="text-sm font-medium">Nenhum cliente encontrado</p>
                   </td>
                 </tr>
@@ -352,9 +346,6 @@ const ClientsPage: React.FC = () => {
                       ) : (
                         <span className="text-stone-600">-</span>
                       )}
-                    </td>
-                    <td className="px-6 py-5 font-bold text-amber-500">
-                      {formatCurrency(client.totalRevenue || 0)}
                     </td>
                     <td className="px-6 py-5 text-right">
                       <div className="relative inline-block">
@@ -560,20 +551,6 @@ const ClientsPage: React.FC = () => {
                     placeholder="12 Out 2024"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-1 block">
-                  Faturamento Total (R$)
-                </label>
-                <input 
-                  type="number" 
-                  value={formData.totalRevenue}
-                  onChange={e => setFormData({...formData, totalRevenue: parseFloat(e.target.value) || 0})}
-                  className="w-full rounded-lg bg-stone-950 border border-white/10 p-3 text-sm text-white focus:border-amber-500 outline-none"
-                  placeholder="15250.00"
-                  step="0.01"
-                />
               </div>
 
               <div className="flex gap-4 pt-4">
