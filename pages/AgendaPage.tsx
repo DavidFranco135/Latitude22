@@ -302,6 +302,22 @@ const AgendaPage: React.FC = () => {
     setActiveMenuId(null);
   };
 
+  const handleDeleteReserva = async (r: ReservaOnline) => {
+    let msg = `Apagar a reserva de ${r.client}${r.protocolo ? ` (${r.protocolo})` : ''}?`;
+    if (r.valorPago > 0) msg += `\n\nValor pago registrado: ${fmt(r.valorPago)}\nOs lançamentos financeiros vinculados também serão removidos.`;
+    msg += `\n\nEssa ação não pode ser desfeita.`;
+    if (!window.confirm(msg)) return;
+    try {
+      const snap = await getDocs(query(collection(db, 'financial'), where('reservaId', '==', r.id)));
+      await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+      await deleteDoc(doc(db, 'reservas', r.id));
+      showMsg(`Reserva removida${snap.size > 0 ? ` — ${snap.size} lançamento(s) estornado(s)` : ''}`);
+    } catch (err: any) {
+      showMsg('Erro ao apagar: ' + (err.message || 'tente novamente'));
+    }
+    setActiveMenuId(null);
+  };
+
   const updateStatus = async (id: string, status: Appointment['status']) => {
     await updateDoc(doc(db, 'appointments', id), { status });
     showMsg('Status atualizado!');
@@ -476,6 +492,11 @@ const AgendaPage: React.FC = () => {
             <button onClick={e => { e.stopPropagation(); openEditReservaModal(r); }}
               className="flex w-full items-center gap-3 px-4 py-3 text-sm text-stone-300 hover:bg-stone-700 hover:text-white">
               <Edit2 size={14}/>Editar Reserva
+            </button>
+            <div className="h-px bg-white/10"/>
+            <button onClick={e => { e.stopPropagation(); handleDeleteReserva(r); }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-red-500/10">
+              <Trash2 size={14}/>Excluir Reserva
             </button>
           </div>
         )}
