@@ -314,7 +314,71 @@ const BudgetsPage: React.FC = () => {
           )}
         </div>
         
-        <div className="overflow-x-auto">
+        {/* MOBILE: cards (sem scroll horizontal) */}
+        <div className="md:hidden divide-y divide-white/5">
+          {filteredBudgets.length === 0 ? (
+            <div className="px-4 py-8 text-center text-stone-500 text-sm">
+              {searchTerm || statusFilter ? 'Nenhum orçamento encontrado com os filtros aplicados' : 'Nenhum orçamento cadastrado'}
+            </div>
+          ) : (
+            filteredBudgets.map((budget) => {
+              const statusBadge = getStatusBadge(budget.status);
+              return (
+                <div key={budget.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-stone-100 uppercase tracking-wide text-sm truncate">{budget.clientName}</p>
+                      <p className="text-stone-500 text-xs mt-0.5 truncate">{budget.package}</p>
+                    </div>
+                    <span className={`flex-shrink-0 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest border ${statusBadge.color}`}>
+                      {statusBadge.text}
+                    </span>
+                  </div>
+
+                  <p className="font-bold text-amber-500 text-lg tracking-tight">{formatCurrency(budget.amount)}</p>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {budget.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => updateStatus(budget.id, 'approved')}
+                          className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-green-500 bg-stone-950 rounded-lg border border-white/5"
+                          style={{ minHeight: '44px' }}
+                        >
+                          <CheckCircle size={14} /> Aprovar
+                        </button>
+                        <button
+                          onClick={() => updateStatus(budget.id, 'rejected')}
+                          className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-red-500 bg-stone-950 rounded-lg border border-white/5"
+                          style={{ minHeight: '44px' }}
+                        >
+                          <XCircle size={14} /> Recusar
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => exportBudgetToPDF(budget)}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-amber-500 bg-stone-950 rounded-lg border border-white/5"
+                      style={{ minHeight: '44px' }}
+                    >
+                      <FileText size={14} /> PDF
+                    </button>
+                    <button
+                      onClick={() => deleteBudget(budget.id, budget.clientName)}
+                      className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-bold text-red-400 bg-stone-950 rounded-lg border border-white/5"
+                      style={{ minHeight: '44px' }}
+                    >
+                      <Trash2 size={14} /> Excluir
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* DESKTOP: tabela completa */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-stone-950 text-xs font-bold uppercase tracking-widest text-stone-600">
               <tr>
